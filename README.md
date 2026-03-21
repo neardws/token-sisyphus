@@ -20,6 +20,8 @@
 
 ---
 
+![demo](assets/demo.gif)
+
 ## Why does this exist?
 
 Many companies now track employee AI usage as a productivity KPI.  
