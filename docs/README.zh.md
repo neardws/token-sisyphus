@@ -104,6 +104,7 @@ python burn.py --target 100k --dry-run
 | Anthropic Claude | `claude` | — |
 | Google Gemini | `gemini` | — |
 | DeepSeek | `openai` | `https://api.deepseek.com/v1` |
+| 小米 MiMo | `openai` | `https://api.xiaomimimo.com/v1` |
 | 通义千问 | `openai` | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
 | Moonshot / Kimi | `openai` | `https://api.moonshot.cn/v1` |
 | 智谱 / GLM | `openai` | `https://open.bigmodel.cn/api/paas/v4` |

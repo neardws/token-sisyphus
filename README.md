@@ -145,6 +145,7 @@ Any OpenAI-compatible endpoint works out of the box:
 |----------|------------|
 | OpenAI | (default) |
 | DeepSeek | `https://api.deepseek.com/v1` |
+| Xiaomi MiMo | `https://api.xiaomimimo.com/v1` |
 | Qwen / Tongyi | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
 | Moonshot / Kimi | `https://api.moonshot.cn/v1` |
 | Zhipu / GLM | `https://open.bigmodel.cn/api/paas/v4` |
