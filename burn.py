@@ -42,8 +42,8 @@ PROMPTS = [
 
 # ── Provider adapters ─────────────────────────────────────────────────────────
 
-def burn_openai(target, model, api_key, base_url, max_tokens, delay, dry_run):
-    """OpenAI and OpenAI-compatible APIs."""
+def burn_openai(target, model, api_key, base_url, max_tokens, delay, dry_run, use_responses_api=False):
+    """OpenAI and OpenAI-compatible APIs. Supports both chat/completions and Responses API."""
     try:
         from openai import OpenAI
     except ImportError:
@@ -57,13 +57,26 @@ def burn_openai(target, model, api_key, base_url, max_tokens, delay, dry_run):
             kwargs["base_url"] = base_url
         client = OpenAI(**kwargs)
 
-    def call(prompt):
-        resp = client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=max_tokens,
-        )
-        return resp.usage.total_tokens if resp.usage else max_tokens
+    if use_responses_api:
+        def call(prompt):
+            resp = client.responses.create(
+                model=model,
+                input=prompt,
+                max_output_tokens=max_tokens,
+            )
+            usage = resp.usage
+            if usage:
+                return (getattr(usage, 'input_tokens', 0) +
+                        getattr(usage, 'output_tokens', 0))
+            return max_tokens
+    else:
+        def call(prompt):
+            resp = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=max_tokens,
+            )
+            return resp.usage.total_tokens if resp.usage else max_tokens
 
     return _run_loop(target, model, delay, dry_run, call)
 
@@ -208,6 +221,9 @@ Examples:
         help="API key (falls back to provider env var)")
     parser.add_argument("--base-url", default=None,
         help="Custom base URL (openai provider only)")
+    parser.add_argument("--api", default="completions",
+        choices=["completions", "responses"],
+        help="OpenAI API type: completions (default) or responses (for gpt-5.x / codex)")
     parser.add_argument("--max-tokens", type=int, default=500,
         help="Max tokens per request (default: 500)")
     parser.add_argument("--delay", type=float, default=0.5,
@@ -249,7 +265,8 @@ def main():
 
     if args.provider == "openai":
         burn_openai(target, model, args.api_key, args.base_url,
-                    args.max_tokens, args.delay, args.dry_run)
+                    args.max_tokens, args.delay, args.dry_run,
+                    use_responses_api=(args.api == "responses"))
     elif args.provider == "claude":
         burn_claude(target, model, args.api_key,
                     args.max_tokens, args.delay, args.dry_run)

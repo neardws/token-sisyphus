@@ -63,6 +63,9 @@ Examples:
         help="Model to use for all agents (default: gpt-4o-mini)")
     parser.add_argument("--api-key", default=None)
     parser.add_argument("--base-url", default=None)
+    parser.add_argument("--api", default="completions",
+        choices=["completions", "responses"],
+        help="OpenAI API type: completions (default) or responses (for gpt-5.x)")
     parser.add_argument("--no-pr", action="store_true",
         help="Skip opening a GitHub PR")
     parser.add_argument("--dry-run", action="store_true",
@@ -88,20 +91,33 @@ def make_client(api_key, base_url):
     return OpenAI(**kwargs)
 
 
-def call(client, model, system, user, label="", token_counter=None):
-    """Single LLM call. Returns (text, tokens_used)."""
+def call(client, model, system, user, label="", token_counter=None, use_responses_api=False):
+    """Single LLM call. Supports both chat/completions and Responses API."""
     if label:
         print(f"  → {label}...", end="", flush=True)
-    resp = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user",   "content": user},
-        ],
-        max_tokens=2000,
-    )
-    text = resp.choices[0].message.content or ""
-    tokens = resp.usage.total_tokens if resp.usage else 0
+
+    if use_responses_api:
+        resp = client.responses.create(
+            model=model,
+            input=f"{system}\n\n{user}",
+            max_output_tokens=2000,
+        )
+        text = resp.output_text or ""
+        usage = resp.usage
+        tokens = ((getattr(usage, 'input_tokens', 0) +
+                   getattr(usage, 'output_tokens', 0)) if usage else 0)
+    else:
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user",   "content": user},
+            ],
+            max_tokens=2000,
+        )
+        text = resp.choices[0].message.content or ""
+        tokens = resp.usage.total_tokens if resp.usage else 0
+
     if token_counter is not None:
         token_counter[0] += tokens
     if label:
@@ -128,7 +144,7 @@ def pad_tokens(client, model, current, target, token_counter):
 
 # ── Agents ────────────────────────────────────────────────────────────────────
 
-def agent_architect(client, model, wish, source_code, token_counter, dry_run):
+def agent_architect(client, model, wish, source_code, token_counter, dry_run, use_responses_api=False):
     print("\n[1/4] 🏗  Architect — analyzing wish and designing solution")
     if dry_run:
         print("  → (dry run, skipping)")
@@ -141,10 +157,10 @@ def agent_architect(client, model, wish, source_code, token_counter, dry_run):
         Be specific and actionable. No code yet.
     """)
     user = f"Current tool source:\n\n```python\n{source_code}\n```\n\nFeature wish: {wish}"
-    return call(client, model, system, user, "designing solution", token_counter)
+    return call(client, model, system, user, "designing solution", token_counter, use_responses_api)
 
 
-def agent_coder(client, model, wish, source_code, design_plan, token_counter, dry_run):
+def agent_coder(client, model, wish, source_code, design_plan, token_counter, dry_run, use_responses_api=False):
     print("\n[2/4] 💻  Coder — implementing changes")
     if dry_run:
         print("  → (dry run, skipping)")
@@ -165,10 +181,10 @@ def agent_coder(client, model, wish, source_code, design_plan, token_counter, dr
         f"Original source:\n```python\n{source_code}\n```\n\n"
         "Output the complete updated Python file:"
     )
-    return call(client, model, system, user, "writing code", token_counter)
+    return call(client, model, system, user, "writing code", token_counter, use_responses_api)
 
 
-def agent_reviewer(client, model, wish, original_code, new_code, token_counter, dry_run):
+def agent_reviewer(client, model, wish, original_code, new_code, token_counter, dry_run, use_responses_api=False):
     print("\n[3/4] 🔍  Reviewer — independent AI code review")
     if dry_run:
         print("  → (dry run, skipping)")
@@ -190,10 +206,10 @@ def agent_reviewer(client, model, wish, original_code, new_code, token_counter, 
         f"Original:\n```python\n{original_code[:2000]}\n```\n\n"
         f"Updated:\n```python\n{new_code[:2000]}\n```"
     )
-    return call(client, model, system, user, "reviewing", token_counter)
+    return call(client, model, system, user, "reviewing", token_counter, use_responses_api)
 
 
-def agent_tester(client, model, wish, new_code, token_counter, dry_run):
+def agent_tester(client, model, wish, new_code, token_counter, dry_run, use_responses_api=False):
     print("\n[4/4] 🧪  Tester — generating test cases")
     if dry_run:
         print("  → (dry run, skipping)")
@@ -206,7 +222,7 @@ def agent_tester(client, model, wish, new_code, token_counter, dry_run):
         Format: one test per line, starting with `# test:` comment then the command.
     """)
     user = f"Feature wish: {wish}\n\nUpdated code:\n```python\n{new_code[:2000]}\n```"
-    return call(client, model, system, user, "generating tests", token_counter)
+    return call(client, model, system, user, "generating tests", token_counter, use_responses_api)
 
 
 # ── Output ────────────────────────────────────────────────────────────────────
@@ -279,13 +295,14 @@ def main():
         print(f"    Mode   : LIVE\n")
 
     client = None if args.dry_run else make_client(args.api_key, args.base_url)
+    use_responses = (args.api == "responses")
 
     # Run the four-agent pipeline
     for attempt in range(1, MAX_RETRIES + 1):
-        design   = agent_architect(client, args.model, args.wish, source_code, token_counter, args.dry_run)
-        new_code = agent_coder(client, args.model, args.wish, source_code, design, token_counter, args.dry_run)
-        review   = agent_reviewer(client, args.model, args.wish, source_code, new_code, token_counter, args.dry_run)
-        tests    = agent_tester(client, args.model, args.wish, new_code, token_counter, args.dry_run)
+        design   = agent_architect(client, args.model, args.wish, source_code, token_counter, args.dry_run, use_responses)
+        new_code = agent_coder(client, args.model, args.wish, source_code, design, token_counter, args.dry_run, use_responses)
+        review   = agent_reviewer(client, args.model, args.wish, source_code, new_code, token_counter, args.dry_run, use_responses)
+        tests    = agent_tester(client, args.model, args.wish, new_code, token_counter, args.dry_run, use_responses)
 
         if args.dry_run or review.strip().upper().startswith("PASS"):
             print(f"\n  Review: ✅ PASS")
