@@ -4,18 +4,18 @@ token-sisyphus evolve mode — self-improving agent pipeline
 
 Four-agent pipeline:
   1. Architect  — analyzes wish, designs solution
-  2. Coder      — implements the changes
-  3. Reviewer   — independent AI code review
-  4. Tester     — generates tests, runs dry-run validation
+  2. Coder      — produces a unified diff (patch) implementing the changes
+  3. Reviewer   — reviews the diff for correctness and safety
+  4. Tester     — generates test cases for the new feature
 
 Outputs:
-  - burn_evolved.py  (the improved script)
-  - CHANGES.md       (what changed and why)
+  - burn.py        (patched in place)
+  - CHANGES.md     (what changed and why)
   - Opens a GitHub PR automatically if all agents pass
 
 Usage:
   python evolve.py --wish "add email summary after each run" --target 30k
-  python evolve.py --wish "support concurrent requests" --target 50k --dry-run
+  python evolve.py --wish "add --schedule flag for cron" --target 20k --no-pr
 """
 
 import argparse
@@ -26,6 +26,7 @@ import time
 import random
 import subprocess
 import textwrap
+
 from datetime import datetime
 from pathlib import Path
 
@@ -39,7 +40,6 @@ except ImportError:
 # ── Config ────────────────────────────────────────────────────────────────────
 
 SOURCE_FILE = Path(__file__).parent / "burn.py"
-OUTPUT_FILE = Path(__file__).parent / "burn_evolved.py"
 CHANGES_FILE = Path(__file__).parent / "CHANGES.md"
 MAX_RETRIES = 3
 
@@ -100,7 +100,7 @@ def call(client, model, system, user, label="", token_counter=None, use_response
         resp = client.responses.create(
             model=model,
             input=f"{system}\n\n{user}",
-            max_output_tokens=2000,
+            max_output_tokens=4000,
         )
         text = resp.output_text or ""
         usage = resp.usage
@@ -113,7 +113,7 @@ def call(client, model, system, user, label="", token_counter=None, use_response
                 {"role": "system", "content": system},
                 {"role": "user",   "content": user},
             ],
-            max_tokens=2000,
+            max_tokens=4000,
         )
         text = resp.choices[0].message.content or ""
         tokens = resp.usage.total_tokens if resp.usage else 0
@@ -125,7 +125,7 @@ def call(client, model, system, user, label="", token_counter=None, use_response
     return text
 
 
-def pad_tokens(client, model, current, target, token_counter):
+def pad_tokens(client, model, current, target, token_counter, use_responses_api=False):
     """Burn remaining tokens with lightweight calls if we're under target."""
     pad_prompts = [
         "List three interesting properties of Python generators.",
@@ -133,13 +133,59 @@ def pad_tokens(client, model, current, target, token_counter):
         "Explain the difference between a list and a deque briefly.",
         "What makes a good commit message?",
         "Name two underrated standard library modules in Python.",
+        "What is the difference between a process and a thread?",
+        "Why does Python's GIL exist and when does it matter?",
     ]
     while current < target:
         prompt = random.choice(pad_prompts)
-        _, t = call(client, model, "You are a helpful assistant.", prompt,
-                    label=f"padding (total so far: {current:,})", token_counter=token_counter)
+        call(client, model, "You are a helpful assistant.", prompt,
+             label=f"padding ({current:,}/{target:,})", token_counter=token_counter,
+             use_responses_api=use_responses_api)
         current = token_counter[0]
         time.sleep(0.3)
+
+
+# ── Patch helpers ─────────────────────────────────────────────────────────────
+
+def apply_search_replace(original: str, patch_text: str) -> tuple[str, int]:
+    """
+    Apply SEARCH/REPLACE blocks to original source.
+    Returns (patched_text, n_applied).
+    Each block format:
+        SEARCH:
+        <exact lines>
+        REPLACE:
+        <new lines>
+        END
+    """
+    result = original
+    applied = 0
+
+    # Parse blocks
+    blocks = []
+    i = 0
+    lines = patch_text.splitlines()
+    while i < len(lines):
+        if lines[i].strip() == "SEARCH:":
+            search_lines = []
+            i += 1
+            while i < len(lines) and lines[i].strip() != "REPLACE:":
+                search_lines.append(lines[i])
+                i += 1
+            replace_lines = []
+            i += 1  # skip REPLACE:
+            while i < len(lines) and lines[i].strip() != "END":
+                replace_lines.append(lines[i])
+                i += 1
+            blocks.append(("\n".join(search_lines), "\n".join(replace_lines)))
+        i += 1
+
+    for search, replace in blocks:
+        if search in result:
+            result = result.replace(search, replace, 1)
+            applied += 1
+
+    return result, applied
 
 
 # ── Agents ────────────────────────────────────────────────────────────────────
@@ -152,85 +198,103 @@ def agent_architect(client, model, wish, source_code, token_counter, dry_run, us
 
     system = textwrap.dedent("""
         You are a senior software architect reviewing a Python CLI tool.
-        Your job: given a feature wish, produce a concise design plan (max 300 words).
-        Focus on: what to change, what to add, what edge cases to consider.
-        Be specific and actionable. No code yet.
+        Your job: given a feature wish, produce a concise design plan (max 250 words).
+        Be extremely specific:
+        - Quote the exact function name(s) that need to change
+        - Quote the exact argparse argument(s) to add (name, type, default)
+        - Quote the exact location in main() where new logic goes
+        - List edge cases to handle
+        No code yet, just the plan.
     """)
     user = f"Current tool source:\n\n```python\n{source_code}\n```\n\nFeature wish: {wish}"
     return call(client, model, system, user, "designing solution", token_counter, use_responses_api)
 
 
 def agent_coder(client, model, wish, source_code, design_plan, token_counter, dry_run, use_responses_api=False):
-    print("\n[2/4] 💻  Coder — implementing changes")
+    print("\n[2/4] 💻  Coder — generating patch")
     if dry_run:
         print("  → (dry run, skipping)")
-        return source_code + "\n# evolve: simulated change\n"
+        return "SEARCH:\n#!/usr/bin/env python3\nREPLACE:\n#!/usr/bin/env python3\n# evolve: simulated change\n"
 
     system = textwrap.dedent("""
-        You are an expert Python developer implementing a feature in a CLI tool.
-        Given the original source code and a design plan, produce the complete updated Python file.
+        You are an expert Python developer. Given original source code and a design plan,
+        produce one or more SEARCH/REPLACE blocks to implement the requested feature.
+
+        Format — repeat for each change:
+        SEARCH:
+        <exact lines from the original file to find, verbatim>
+        REPLACE:
+        <new lines to substitute in>
+        END
+
         Rules:
-        - Output ONLY the complete Python source code, no markdown fences, no explanation
-        - Preserve all existing functionality
-        - Keep the code clean, well-commented, under 300 lines
-        - The file must be runnable as-is
+        - SEARCH must be an exact verbatim copy of lines from the original (whitespace matters)
+        - SEARCH block should be 2-5 lines that uniquely identify the location
+        - REPLACE contains the full replacement (can be more or fewer lines than SEARCH)
+        - Output ONLY the SEARCH/REPLACE blocks, no explanation, no markdown fences
+        - If adding new code at the end of a function, use the last 2 lines of that function as SEARCH
+        - NEVER write recursive calls (a function calling itself)
+        - Loop logic must use while/for, not recursion
+        - New scheduling logic must go inside main(), not in a separate helper that calls main()
     """)
     user = (
         f"Design plan:\n{design_plan}\n\n"
         f"Feature wish: {wish}\n\n"
-        f"Original source:\n```python\n{source_code}\n```\n\n"
-        "Output the complete updated Python file:"
+        f"Original source (burn.py):\n```python\n{source_code}\n```\n\n"
+        "Output the SEARCH/REPLACE blocks:"
     )
-    return call(client, model, system, user, "writing code", token_counter, use_responses_api)
+    return call(client, model, system, user, "generating patch", token_counter, use_responses_api)
 
 
-def agent_reviewer(client, model, wish, original_code, new_code, token_counter, dry_run, use_responses_api=False):
-    print("\n[3/4] 🔍  Reviewer — independent AI code review")
+def agent_reviewer(client, model, wish, source_code, patch_text, token_counter, dry_run, use_responses_api=False):
+    print("\n[3/4] 🔍  Reviewer — reviewing patch")
     if dry_run:
         print("  → (dry run, skipping)")
         return "PASS: simulated review passed."
 
     system = textwrap.dedent("""
-        You are a critical code reviewer. Review the code change for:
-        1. Correctness — does it implement the wish properly?
+        You are a critical code reviewer. Review these SEARCH/REPLACE blocks for a Python CLI tool.
+        Check:
+        1. Correctness — do the changes implement the wish properly?
         2. Safety — no shell injection, no hardcoded secrets, no destructive ops
         3. Backwards compatibility — existing CLI flags still work
-        4. Code quality — no obvious bugs, reasonable error handling
+        4. Completeness — are all necessary changes included?
+
+        The source imports section shows what modules are already imported — do NOT fail for missing imports if they already exist there.
 
         Respond with either:
         PASS: <brief reason>
         FAIL: <specific problems to fix>
     """)
+    # Give reviewer context: imports from source + full patch
+    import_section = "\n".join(source_code.splitlines()[:35])  # imports + early constants
     user = (
         f"Feature wish: {wish}\n\n"
-        f"Original:\n```python\n{original_code[:2000]}\n```\n\n"
-        f"Updated:\n```python\n{new_code[:2000]}\n```"
+        f"Source imports (for reference):\n```python\n{import_section}\n```\n\n"
+        f"SEARCH/REPLACE blocks:\n{patch_text}"
     )
-    return call(client, model, system, user, "reviewing", token_counter, use_responses_api)
+    return call(client, model, system, user, "reviewing patch", token_counter, use_responses_api)
 
 
-def agent_tester(client, model, wish, new_code, token_counter, dry_run, use_responses_api=False):
+def agent_tester(client, model, wish, patch_text, token_counter, dry_run, use_responses_api=False):
     print("\n[4/4] 🧪  Tester — generating test cases")
     if dry_run:
         print("  → (dry run, skipping)")
         return "Simulated test cases: all pass."
 
     system = textwrap.dedent("""
-        You are a QA engineer. Given updated Python CLI tool code and a feature wish,
+        You are a QA engineer. Given SEARCH/REPLACE code changes for a Python CLI tool and a feature wish,
         write 3-5 concrete CLI test cases (as bash commands with expected behavior).
         Focus on the new feature and regression of existing flags.
         Format: one test per line, starting with `# test:` comment then the command.
     """)
-    user = f"Feature wish: {wish}\n\nUpdated code:\n```python\n{new_code[:2000]}\n```"
+    user = f"Feature wish: {wish}\n\nCode changes:\n{patch_text}"
     return call(client, model, system, user, "generating tests", token_counter, use_responses_api)
 
 
 # ── Output ────────────────────────────────────────────────────────────────────
 
-def write_outputs(new_code, design_plan, review_result, test_cases, wish):
-    OUTPUT_FILE.write_text(new_code)
-    print(f"\n  ✅ Written: {OUTPUT_FILE.name}")
-
+def write_outputs(patch_text, design_plan, review_result, test_cases, wish):
     changes = textwrap.dedent(f"""
         # CHANGES — {datetime.now().strftime('%Y-%m-%d')}
 
@@ -239,6 +303,11 @@ def write_outputs(new_code, design_plan, review_result, test_cases, wish):
 
         ## Design Plan
         {design_plan}
+
+        ## Patch Applied
+        ```
+        {patch_text}
+        ```
 
         ## Review Result
         {review_result}
@@ -261,7 +330,7 @@ def open_pr(wish, dry_run):
     print(f"\n  Opening PR on branch: {branch}")
     cmds = [
         ["git", "checkout", "-b", branch],
-        ["git", "add", str(OUTPUT_FILE), str(CHANGES_FILE)],
+        ["git", "add", str(SOURCE_FILE), str(CHANGES_FILE)],
         ["git", "commit", "-m", f"evolve: {wish[:60]}"],
         ["git", "push", "-u", "origin", branch],
         ["gh", "pr", "create",
@@ -270,7 +339,8 @@ def open_pr(wish, dry_run):
          "--base", "main"],
     ]
     for cmd in cmds:
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True,
+                                cwd=str(SOURCE_FILE.parent))
         if result.returncode != 0:
             print(f"  ⚠️  {' '.join(cmd[:2])} failed: {result.stderr.strip()}")
             return
@@ -282,48 +352,77 @@ def open_pr(wish, dry_run):
 def main():
     args = parse_args()
     target = parse_target(args.target)
-    source_code = SOURCE_FILE.read_text()
+    original_source = SOURCE_FILE.read_text()
     token_counter = [0]
 
     print(f"\n🪨  token-sisyphus evolve mode")
     print(f"    Wish   : {args.wish}")
     print(f"    Target : {target:,} tokens")
     print(f"    Model  : {args.model}")
-    if args.dry_run:
-        print(f"    Mode   : DRY RUN\n")
-    else:
-        print(f"    Mode   : LIVE\n")
+    print(f"    Mode   : {'DRY RUN' if args.dry_run else 'LIVE'}\n")
 
     client = None if args.dry_run else make_client(args.api_key, args.base_url)
     use_responses = (args.api == "responses")
 
-    # Run the four-agent pipeline
+    source_code = original_source
+    final_diff = None
+    final_patched = None
+
     for attempt in range(1, MAX_RETRIES + 1):
         design   = agent_architect(client, args.model, args.wish, source_code, token_counter, args.dry_run, use_responses)
-        new_code = agent_coder(client, args.model, args.wish, source_code, design, token_counter, args.dry_run, use_responses)
-        review   = agent_reviewer(client, args.model, args.wish, source_code, new_code, token_counter, args.dry_run, use_responses)
-        tests    = agent_tester(client, args.model, args.wish, new_code, token_counter, args.dry_run, use_responses)
+        diff_raw = agent_coder(client, args.model, args.wish, source_code, design, token_counter, args.dry_run, use_responses)
+        review   = agent_reviewer(client, args.model, args.wish, source_code, diff_raw, token_counter, args.dry_run, use_responses)
+        tests    = agent_tester(client, args.model, args.wish, diff_raw, token_counter, args.dry_run, use_responses)
 
-        if args.dry_run or review.strip().upper().startswith("PASS"):
+        passed = args.dry_run or review.strip().upper().startswith("PASS")
+
+        if not args.dry_run:
+            # Apply SEARCH/REPLACE blocks
+            patched, n_applied = apply_search_replace(source_code, diff_raw)
+            if n_applied == 0:
+                print(f"\n  ⚠️  No SEARCH blocks matched source (attempt {attempt}/{MAX_RETRIES})")
+                if attempt == MAX_RETRIES:
+                    print("\n  All attempts failed. Writing failure report.")
+                    Path("FAILED.md").write_text(
+                        f"# Evolve failed\n\nWish: {args.wish}\n\nNo SEARCH blocks matched.\n\nPatch:\n{diff_raw}\n\nReview:\n{review}"
+                    )
+                    sys.exit(1)
+                continue
+            diff_text = diff_raw  # store for CHANGES.md
+        else:
+            diff_text = diff_raw
+            patched = source_code + "\n# evolve: simulated change\n"
+
+        if passed:
             print(f"\n  Review: ✅ PASS")
+            final_diff = diff_text
+            final_patched = patched
             break
         else:
             print(f"\n  Review: ❌ FAIL (attempt {attempt}/{MAX_RETRIES})")
             print(f"  Reason: {review[:200]}")
             if attempt == MAX_RETRIES:
                 print("\n  All attempts failed. Writing failure report.")
-                Path("FAILED.md").write_text(f"# Evolve failed\n\nWish: {args.wish}\n\nReview:\n{review}")
+                Path("FAILED.md").write_text(
+                    f"# Evolve failed\n\nWish: {args.wish}\n\nReview:\n{review}"
+                )
                 sys.exit(1)
-            source_code = new_code  # feed evolved code back for retry
+            # Feed the patched code back for next attempt
+            source_code = patched
+
+    # Apply patch to burn.py
+    if not args.dry_run and final_patched:
+        SOURCE_FILE.write_text(final_patched)
+        print(f"  ✅ Patched: {SOURCE_FILE.name}")
 
     # Pad to target token count if needed
     if not args.dry_run and token_counter[0] < target:
         print(f"\n  Padding to target ({token_counter[0]:,} / {target:,} tokens)...")
-        pad_tokens(client, args.model, token_counter[0], target, token_counter)
+        pad_tokens(client, args.model, token_counter[0], target, token_counter, use_responses)
 
-    # Write outputs
+    # Write CHANGES.md
     print(f"\n  Writing outputs...")
-    write_outputs(new_code, design, review, tests, args.wish)
+    write_outputs(final_diff, design, review, tests, args.wish)
 
     # Open PR
     if not args.no_pr:
