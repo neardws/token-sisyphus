@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.0.1 (2026-03-21)
+
+### 🔧 Release improvements
+- Split release artifacts into per-platform packages
+  - `core` — `burn.py` only
+  - `skills-all` — all platform skill files bundled
+  - `skill-claude-code` / `skill-codex` / `skill-gemini-cli` / `skill-opencode` / `skill-openclaw` — individual skill files
+  - `full` — everything
+
+---
+
 ## v1.0.0 (2026-03-21)
 
 ### 🎉 Initial Release

@@ -30,10 +30,26 @@ jobs:
         id: version
         run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
-      - name: Create release archive
+      - name: Create archives
         run: |
-          zip -r token-sisyphus-${{ steps.version.outputs.version }}.zip \
-            burn.py README.md docs/ skills/ assets/ \
+          VER=${{ steps.version.outputs.version }}
+
+          # Core only
+          zip -j token-sisyphus-core-${VER}.zip burn.py
+
+          # All skills (bundle)
+          zip -r token-sisyphus-skills-all-${VER}.zip skills/ --exclude "*.pyc"
+
+          # Per-platform skill packages
+          zip -j token-sisyphus-skill-claude-code-${VER}.zip   skills/claude-code/CLAUDE.md
+          zip -j token-sisyphus-skill-codex-${VER}.zip         skills/codex/AGENTS.md
+          zip -j token-sisyphus-skill-gemini-cli-${VER}.zip    skills/gemini-cli/gemini.md
+          zip -j token-sisyphus-skill-opencode-${VER}.zip      skills/opencode/rules.md
+          zip -j token-sisyphus-skill-openclaw-${VER}.zip      skills/openclaw/SKILL.md
+
+          # Full bundle (everything)
+          zip -r token-sisyphus-full-${VER}.zip \
+            burn.py README.md docs/ skills/ assets/ CHANGELOG.md \
             --exclude "*.pyc" --exclude "__pycache__/*" --exclude ".venv/*"
 
       - name: Create GitHub Release
@@ -41,24 +57,46 @@ jobs:
         with:
           name: "🪨 token-sisyphus ${{ steps.version.outputs.version }}"
           body: |
-            ## What's in this release
+            ## Downloads
 
-            See [CHANGELOG](https://github.com/neardws/token-sisyphus/blob/main/CHANGELOG.md) for details.
+            | Package | Contents |
+            |---------|----------|
+            | `token-sisyphus-core-*.zip` | `burn.py` only |
+            | `token-sisyphus-skills-all-*.zip` | All platform skill files |
+            | `token-sisyphus-skill-claude-code-*.zip` | Claude Code (`CLAUDE.md`) |
+            | `token-sisyphus-skill-codex-*.zip` | OpenAI Codex (`AGENTS.md`) |
+            | `token-sisyphus-skill-gemini-cli-*.zip` | Gemini CLI (`gemini.md`) |
+            | `token-sisyphus-skill-opencode-*.zip` | OpenCode (`rules.md`) |
+            | `token-sisyphus-skill-openclaw-*.zip` | OpenClaw (`SKILL.md`) |
+            | `token-sisyphus-full-*.zip` | Everything |
 
-            ## Quick install
+            ## Quick start
 
             ```bash
-            # Download and run
-            curl -O https://github.com/neardws/token-sisyphus/releases/download/${{ steps.version.outputs.version }}/token-sisyphus-${{ steps.version.outputs.version }}.zip
-            unzip token-sisyphus-*.zip
-            pip install openai   # or anthropic / google-generativeai
+            # Core only
+            unzip token-sisyphus-core-*.zip
+            pip install openai
             python burn.py --target 100k --dry-run
+
+            # Claude
+            pip install anthropic
+            python burn.py --target 100k --provider claude --dry-run
+
+            # Gemini
+            pip install google-generativeai
+            python burn.py --target 100k --provider gemini --dry-run
             ```
 
-            ## Providers supported
-            - OpenAI / any OpenAI-compatible API
-            - Anthropic Claude
-            - Google Gemini
-          files: token-sisyphus-${{ steps.version.outputs.version }}.zip
+            ## Changelog
+            See [CHANGELOG.md](https://github.com/neardws/token-sisyphus/blob/main/CHANGELOG.md)
+          files: |
+            token-sisyphus-core-${{ steps.version.outputs.version }}.zip
+            token-sisyphus-skills-all-${{ steps.version.outputs.version }}.zip
+            token-sisyphus-skill-claude-code-${{ steps.version.outputs.version }}.zip
+            token-sisyphus-skill-codex-${{ steps.version.outputs.version }}.zip
+            token-sisyphus-skill-gemini-cli-${{ steps.version.outputs.version }}.zip
+            token-sisyphus-skill-opencode-${{ steps.version.outputs.version }}.zip
+            token-sisyphus-skill-openclaw-${{ steps.version.outputs.version }}.zip
+            token-sisyphus-full-${{ steps.version.outputs.version }}.zip
           draft: false
           prerelease: false
