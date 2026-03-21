@@ -11,7 +11,9 @@
     <a href="README.es.md">Español</a>
   </p>
 
-  <img src="https://img.shields.io/badge/python-3.8%2B-blue" />
+  <img src="https://github.com/neardws/token-sisyphus/actions/workflows/ci.yml/badge.svg" alt="CI" />
+  <img src="https://img.shields.io/github/v/release/neardws/token-sisyphus" alt="Release" />
+  <img src="https://img.shields.io/badge/python-3.9%2B-blue" />
   <img src="https://img.shields.io/badge/license-MIT-green" />
   <img src="https://img.shields.io/badge/API-OpenAI%20兼容-orange" />
 </div>
