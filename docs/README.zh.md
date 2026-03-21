@@ -98,18 +98,18 @@ python burn.py --target 100k --dry-run
 
 ## 兼容的 API
 
-| 服务商 | provider | --base-url |
-|--------|----------|------------|
-| OpenAI | `openai` | （默认） |
-| Anthropic Claude | `claude` | — |
-| Google Gemini | `gemini` | — |
-| DeepSeek | `openai` | `https://api.deepseek.com/v1` |
-| 小米 MiMo | `openai` | `https://api.xiaomimimo.com/v1` |
-| 通义千问 | `openai` | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
-| Moonshot / Kimi | `openai` | `https://api.moonshot.cn/v1` |
-| 智谱 / GLM | `openai` | `https://open.bigmodel.cn/api/paas/v4` |
-| Azure OpenAI | `openai` | 你的 Azure 地址 |
-| vLLM / Ollama | `openai` | 你的自托管地址 |
+| 服务商 | 推荐模型 | provider | --base-url |
+|--------|----------|----------|------------|
+| OpenAI | `gpt-5.4` / `gpt-4o-mini` | `openai` | （默认） |
+| Anthropic Claude | `claude-sonnet-4-6` | `claude` | — |
+| Google Gemini | `gemini-3.1-pro` / `gemini-2.5-flash` | `gemini` | — |
+| DeepSeek | `deepseek-v4` / `deepseek-chat` | `openai` | `https://api.deepseek.com/v1` |
+| 小米 MiMo | `mimo-v2-pro` / `mimo-v2-flash` | `openai` | `https://api.xiaomimimo.com/v1` |
+| 通义千问 | `qwen-turbo` / `qwen-plus` | `openai` | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
+| Moonshot / Kimi | `moonshot-v1-8k` | `openai` | `https://api.moonshot.cn/v1` |
+| 智谱 / GLM | `glm-4-flash` | `openai` | `https://open.bigmodel.cn/api/paas/v4` |
+| Azure OpenAI | 你部署的模型 | `openai` | 你的 Azure 地址 |
+| vLLM / Ollama | 任意本地模型 | `openai` | 你的自托管地址 |
 
 ## Agent Skill 集成
 
@@ -137,4 +137,4 @@ clawhub install token-sisyphus
 
 ## 许可证
 
-MIT © 2025 token-sisyphus contributors
+MIT License — Copyright (c) 2026 neardws and token-sisyphus contributors

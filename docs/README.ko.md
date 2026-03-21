@@ -84,6 +84,20 @@ python burn.py --target 100k --dry-run
 > AI 서비스 남용, 회사 정책 위반, 컴퓨팅 자원 낭비를 권장하지 않습니다.  
 > 만약 정말로 토큰 수로 직원을 평가하는 회사에 다니신다면——문제는 바위가 아니라 평가 제도일 수 있습니다.
 
+## 호환 API 목록
+
+| 제공사 | 추천 모델 | provider | --base-url |
+|-------|----------|----------|------------|
+| OpenAI | `gpt-5.4` / `gpt-4o-mini` | `openai` | (기본값) |
+| Anthropic Claude | `claude-sonnet-4-6` | `claude` | — |
+| Google Gemini | `gemini-3.1-pro` / `gemini-2.5-flash` | `gemini` | — |
+| DeepSeek | `deepseek-v4` | `openai` | `https://api.deepseek.com/v1` |
+| Xiaomi MiMo | `mimo-v2-pro` / `mimo-v2-flash` | `openai` | `https://api.xiaomimimo.com/v1` |
+| Qwen / Tongyi | `qwen-turbo` | `openai` | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
+| Moonshot / Kimi | `moonshot-v1-8k` | `openai` | `https://api.moonshot.cn/v1` |
+| Zhipu / GLM | `glm-4-flash` | `openai` | `https://open.bigmodel.cn/api/paas/v4` |
+| vLLM / Ollama | 로컬 모델 | `openai` | 셀프호스트 URL |
+
 ## 라이선스
 
-MIT © 2025 token-sisyphus contributors
+MIT License — Copyright (c) 2026 neardws and token-sisyphus contributors

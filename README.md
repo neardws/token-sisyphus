@@ -78,22 +78,22 @@ python burn.py --target <amount> [options]
 ## Examples
 
 ```bash
-# OpenAI GPT-4o-mini (default)
-python burn.py --target 100k
+# OpenAI GPT-5.4 (latest)
+python burn.py --target 100k --model gpt-5.4
 
-# Claude Haiku
-python burn.py --target 100k --provider claude --model claude-3-haiku-20240307
+# Claude Sonnet 4.6 (latest)
+python burn.py --target 100k --provider claude --model claude-sonnet-4-6
 
-# Gemini Flash
-python burn.py --target 100k --provider gemini --model gemini-1.5-flash
+# Gemini 3.1 Pro (latest)
+python burn.py --target 100k --provider gemini --model gemini-3.1-pro
 
-# DeepSeek (OpenAI-compatible)
-python burn.py --target 500k --base-url https://api.deepseek.com/v1 --model deepseek-chat
+# DeepSeek V4 (OpenAI-compatible)
+python burn.py --target 500k --base-url https://api.deepseek.com/v1 --model deepseek-v4
 
-# Qwen / Tongyi
-python burn.py --target 200k --base-url https://dashscope.aliyuncs.com/compatible-mode/v1 --model qwen-turbo
+# Xiaomi MiMo V2 Pro
+python burn.py --target 100k --base-url https://api.xiaomimimo.com/v1 --model mimo-v2-pro
 
-# Dry run
+# Dry run (no cost)
 python burn.py --target 100k --dry-run
 ```
 
@@ -109,22 +109,37 @@ Use token-sisyphus directly inside your AI coding assistant:
 | OpenCode | `skills/opencode/rules.md` | Copy to project root |
 | OpenClaw | `skills/openclaw/SKILL.md` | `clawhub install token-sisyphus` |
 
-Copy the relevant file into your project root (or skills folder) and your AI assistant
-will know how to burn tokens on command.
-
 **OpenClaw users** can install directly from [ClawHub](https://clawhub.ai/skills/token-sisyphus):
 
 ```bash
 clawhub install token-sisyphus
 ```
 
+## Compatible APIs
+
+Any OpenAI-compatible endpoint works out of the box:
+
+| Provider | Recommended model | --base-url |
+|----------|-------------------|------------|
+| OpenAI | `gpt-5.4` / `gpt-4o-mini` | (default) |
+| Anthropic Claude | `claude-sonnet-4-6` | use `--provider claude` |
+| Google Gemini | `gemini-3.1-pro` / `gemini-2.5-flash` | use `--provider gemini` |
+| DeepSeek | `deepseek-v4` / `deepseek-chat` | `https://api.deepseek.com/v1` |
+| Xiaomi MiMo | `mimo-v2-pro` / `mimo-v2-flash` | `https://api.xiaomimimo.com/v1` |
+| Qwen / Tongyi | `qwen-turbo` / `qwen-plus` | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
+| Moonshot / Kimi | `moonshot-v1-8k` | `https://api.moonshot.cn/v1` |
+| Zhipu / GLM | `glm-4-flash` | `https://open.bigmodel.cn/api/paas/v4` |
+| Azure OpenAI | your deployed model | your Azure endpoint |
+| vLLM / Ollama | any local model | your self-hosted endpoint |
+
 ## Output
 
 ```
 🪨  token-sisyphus starting...
-    Target : 100,000 tokens
-    Model  : gpt-4o-mini
-    Mode   : LIVE
+    Provider : openai
+    Target   : 100,000 tokens
+    Model    : gpt-5.4
+    Mode     : LIVE
 
   [████████████████████░░░░░░░░░░░░░░░░░░░░] 50.3% (50,312 / 100,000 tokens)  req#87
 
@@ -137,21 +152,6 @@ clawhub install token-sisyphus
     Your boulder has reached the top. See you tomorrow.
 ```
 
-## Compatible APIs
-
-Any OpenAI-compatible endpoint works out of the box:
-
-| Provider | --base-url |
-|----------|------------|
-| OpenAI | (default) |
-| DeepSeek | `https://api.deepseek.com/v1` |
-| Xiaomi MiMo | `https://api.xiaomimimo.com/v1` |
-| Qwen / Tongyi | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
-| Moonshot / Kimi | `https://api.moonshot.cn/v1` |
-| Zhipu / GLM | `https://open.bigmodel.cn/api/paas/v4` |
-| Azure OpenAI | your Azure endpoint |
-| vLLM / Ollama | your self-hosted endpoint |
-
 ## Disclaimer
 
 > This project is a **satirical commentary** on corporate AI productivity metrics.  
@@ -161,4 +161,24 @@ Any OpenAI-compatible endpoint works out of the box:
 
 ## License
 
-MIT © 2025 token-sisyphus contributors
+MIT License
+
+Copyright (c) 2026 neardws and token-sisyphus contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

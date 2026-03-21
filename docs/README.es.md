@@ -83,6 +83,20 @@ python burn.py --target 100k --dry-run
 > Los autores no promueven el mal uso de los servicios de IA, la violación de políticas corporativas ni el desperdicio de recursos computacionales.  
 > Si tu empresa de verdad evalúa a sus empleados por tokens consumidos — el problema quizás no sea la roca.
 
+## APIs compatibles
+
+| Proveedor | Modelo recomendado | provider | --base-url |
+|----------|-------------------|----------|------------|
+| OpenAI | `gpt-5.4` / `gpt-4o-mini` | `openai` | (por defecto) |
+| Anthropic Claude | `claude-sonnet-4-6` | `claude` | — |
+| Google Gemini | `gemini-3.1-pro` / `gemini-2.5-flash` | `gemini` | — |
+| DeepSeek | `deepseek-v4` | `openai` | `https://api.deepseek.com/v1` |
+| Xiaomi MiMo | `mimo-v2-pro` / `mimo-v2-flash` | `openai` | `https://api.xiaomimimo.com/v1` |
+| Qwen / Tongyi | `qwen-turbo` | `openai` | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
+| Moonshot / Kimi | `moonshot-v1-8k` | `openai` | `https://api.moonshot.cn/v1` |
+| Zhipu / GLM | `glm-4-flash` | `openai` | `https://open.bigmodel.cn/api/paas/v4` |
+| vLLM / Ollama | modelo local | `openai` | tu endpoint |
+
 ## Licencia
 
-MIT © 2025 token-sisyphus contributors
+MIT License — Copyright (c) 2026 neardws and token-sisyphus contributors
