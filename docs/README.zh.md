@@ -114,13 +114,19 @@ python burn.py --target 100k --dry-run
 
 把对应文件复制到项目根目录，就能直接在 AI 助手里喊"burn 100k tokens"触发脚本：
 
-| 平台 | 文件 |
-|------|------|
-| Claude Code | `skills/claude-code/CLAUDE.md` |
-| OpenAI Codex | `skills/codex/AGENTS.md` |
-| Gemini CLI | `skills/gemini-cli/gemini.md` |
-| OpenCode | `skills/opencode/rules.md` |
-| OpenClaw | `skills/openclaw/SKILL.md` |
+| 平台 | 文件 | 安装方式 |
+|------|------|---------|
+| Claude Code | `skills/claude-code/CLAUDE.md` | 复制到项目根目录 |
+| OpenAI Codex | `skills/codex/AGENTS.md` | 复制到项目根目录 |
+| Gemini CLI | `skills/gemini-cli/gemini.md` | 复制到项目根目录 |
+| OpenCode | `skills/opencode/rules.md` | 复制到项目根目录 |
+| OpenClaw | `skills/openclaw/SKILL.md` | `clawhub install token-sisyphus` |
+
+**OpenClaw 用户**可以直接从 [ClawHub](https://clawhub.ai/skills/token-sisyphus) 一键安装：
+
+```bash
+clawhub install token-sisyphus
+```
 
 ## 免责声明
 

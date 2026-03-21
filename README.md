@@ -16,6 +16,7 @@
   <img src="https://img.shields.io/badge/python-3.9%2B-blue" />
   <img src="https://img.shields.io/badge/license-MIT-green" />
   <img src="https://img.shields.io/badge/providers-OpenAI%20%7C%20Claude%20%7C%20Gemini-orange" />
+  <a href="https://clawhub.ai/skills/token-sisyphus"><img src="https://img.shields.io/badge/ClawHub-token--sisyphus-blueviolet" alt="ClawHub" /></a>
 </div>
 
 ---
@@ -100,16 +101,22 @@ python burn.py --target 100k --dry-run
 
 Use token-sisyphus directly inside your AI coding assistant:
 
-| Platform | File |
-|----------|------|
-| Claude Code | `skills/claude-code/CLAUDE.md` |
-| OpenAI Codex | `skills/codex/AGENTS.md` |
-| Gemini CLI | `skills/gemini-cli/gemini.md` |
-| OpenCode | `skills/opencode/rules.md` |
-| OpenClaw | `skills/openclaw/SKILL.md` |
+| Platform | File | Install |
+|----------|------|---------|
+| Claude Code | `skills/claude-code/CLAUDE.md` | Copy to project root |
+| OpenAI Codex | `skills/codex/AGENTS.md` | Copy to project root |
+| Gemini CLI | `skills/gemini-cli/gemini.md` | Copy to project root |
+| OpenCode | `skills/opencode/rules.md` | Copy to project root |
+| OpenClaw | `skills/openclaw/SKILL.md` | `clawhub install token-sisyphus` |
 
 Copy the relevant file into your project root (or skills folder) and your AI assistant
 will know how to burn tokens on command.
+
+**OpenClaw users** can install directly from [ClawHub](https://clawhub.ai/skills/token-sisyphus):
+
+```bash
+clawhub install token-sisyphus
+```
 
 ## Output
 
