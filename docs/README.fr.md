@@ -1,7 +1,7 @@
 <div align="center">
   <img src="../assets/logo.png" alt="token-sisyphus logo" width="180" />
   <h1>🪨 token-sisyphus</h1>
-  <p><em>Votre entreprise a créé un classement d'utilisation des tokens IA.<br>Félicitations — vous êtes désormais Sisyphe, et le rocher est un chatbot.</em></p>
+  <p><em>Votre entreprise a lancé un classement d'utilisation des tokens IA.<br>Félicitations — vous êtes désormais Sisyphe, et le rocher, c'est un chatbot.</em></p>
 
   <p>
     <a href="../README.md">English</a> •
@@ -10,26 +10,33 @@
     <a href="README.ko.md">한국어</a> •
     <a href="README.es.md">Español</a>
   </p>
+
+  <img src="https://github.com/neardws/token-sisyphus/actions/workflows/ci.yml/badge.svg" alt="CI" />
+  <img src="https://img.shields.io/github/v/release/neardws/token-sisyphus" alt="Release" />
+  <img src="https://img.shields.io/badge/python-3.9%2B-blue" />
+  <img src="https://img.shields.io/badge/license-MIT-green" />
 </div>
 
 ---
 
-## Pourquoi cet outil existe-t-il ?
+![demo](../assets/demo.gif)
 
-De nombreuses entreprises mesurent désormais l'utilisation de l'IA comme KPI de productivité.  
-Les grands utilisateurs de tokens sont récompensés. Les autres sont questionnés.
+## C'est quoi ce truc ?
 
-Cet outil consomme des tokens LLM en votre nom — pour que vous puissiez dominer le classement IA de votre entreprise sans rien faire.
+De plus en plus d'entreprises mesurent l'utilisation de l'IA comme indicateur de productivité.  
+Les grands consommateurs de tokens sont célébrés. Les autres reçoivent un mail de leur manager.
+
+Cet outil consomme des tokens à votre place — pour que vous puissiez trôner en tête du classement sans lever le petit doigt.
 
 De rien.
 
 ## Fonctionnalités
 
-- 🎯 Consommer jusqu'à un nombre cible de tokens (ex: `100k`, `1m`)
+- 🎯 Consommer jusqu'à un nombre cible de tokens (ex : `100k`, `1m`)
 - 🔌 Compatible **OpenAI, Claude, Gemini** et toute API compatible OpenAI
-- 📊 Barre de progression en temps réel
-- ⚙️ Modèle, délai et tokens max configurables
-- 🧪 Mode simulation sans appels API réels
+- 📊 Barre de progression en temps réel + compteur de requêtes
+- ⚙️ Modèle, délai et tokens max entièrement configurables
+- 🧪 Mode simulation pour tester sans frais
 - 🧩 Fichiers Skill pour Claude Code, Codex, Gemini CLI, OpenCode
 
 ## Démarrage rapide
@@ -54,7 +61,7 @@ python burn.py --target 100k --provider gemini
 ## Exemples
 
 ```bash
-# OpenAI (défaut)
+# OpenAI (par défaut)
 python burn.py --target 100k
 
 # Claude Haiku
@@ -66,15 +73,15 @@ python burn.py --target 100k --provider gemini --model gemini-1.5-flash
 # DeepSeek (compatible OpenAI)
 python burn.py --target 500k --base-url https://api.deepseek.com/v1 --model deepseek-chat
 
-# Mode simulation
+# Mode simulation (sans frais)
 python burn.py --target 100k --dry-run
 ```
 
 ## Avertissement
 
-> Ce projet est un **commentaire satirique** sur les métriques de productivité IA en entreprise.  
-> Il est destiné à des fins éducatives et de divertissement uniquement.  
-> Les auteurs ne cautionnent pas l'abus des services IA, la violation des politiques d'entreprise ou le gaspillage de ressources informatiques.
+> Ce projet est une **satire** du phénomène des KPI d'utilisation IA en entreprise. Il est destiné à des fins éducatives et humoristiques uniquement.  
+> Les auteurs ne cautionnent pas l'abus de services IA, la violation de politiques d'entreprise, ni le gaspillage de ressources.  
+> Si votre entreprise évalue vraiment ses employés au nombre de tokens consommés — le problème n'est peut-être pas le rocher.
 
 ## Licence
 

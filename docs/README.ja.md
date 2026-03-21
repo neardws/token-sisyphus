@@ -1,7 +1,7 @@
 <div align="center">
   <img src="../assets/logo.png" alt="token-sisyphus logo" width="180" />
   <h1>🪨 token-sisyphus</h1>
-  <p><em>あなたの会社はAIトークン使用量のランキングを作りました。<br>おめでとうございます——あなたは今やシーシュポスで、その岩はチャットボットです。</em></p>
+  <p><em>会社がAIトークン使用量のランキングを始めました。<br>おめでとうございます——あなたは今日からシーシュポスです。その岩、チャットボットです。</em></p>
 
   <p>
     <a href="../README.md">English</a> •
@@ -10,26 +10,34 @@
     <a href="README.fr.md">Français</a> •
     <a href="README.es.md">Español</a>
   </p>
+
+  <img src="https://github.com/neardws/token-sisyphus/actions/workflows/ci.yml/badge.svg" alt="CI" />
+  <img src="https://img.shields.io/github/v/release/neardws/token-sisyphus" alt="Release" />
+  <img src="https://img.shields.io/badge/python-3.9%2B-blue" />
+  <img src="https://img.shields.io/badge/license-MIT-green" />
 </div>
 
 ---
 
-## なぜこのツールが存在するのか
+![demo](../assets/demo.gif)
 
-多くの企業がAI使用量を生産性KPIとして計測し始めています。  
-トークンをたくさん使った社員は評価され、少ない社員は怠け者扱いされます。
+## これは何？
 
-このツールはあなたの代わりにトークンを消費し、何もしなくても社内AIランキングのトップに立てます。
+最近、多くの企業がAI使用量を生産性KPIとして管理し始めています。  
+トークンをたくさん使えば表彰される。少なければ「AI活用意識が低い」と言われる。
+
+このツールは、あなたの代わりにトークンを消費してくれます。  
+あなたは何もしなくていい。ランキングはちゃんと上がります。
 
 どういたしまして。
 
 ## 機能
 
-- 🎯 目標トークン数に向けて消費（例：`100k`、`1m`）
-- 🔌 **OpenAI・Claude・Gemini** およびすべてのOpenAI互換API対応
-- 📊 リアルタイムプログレスバー
-- ⚙️ モデル・遅延・最大トークン数の設定可能
-- 🧪 ドライランモード（実際のAPIコールなし）
+- 🎯 目標トークン数まで自動消費（例：`100k`、`1m`）
+- 🔌 **OpenAI・Claude・Gemini** + あらゆるOpenAI互換API対応
+- 📊 リアルタイムプログレスバー＋リクエスト数表示
+- ⚙️ モデル・待機時間・最大トークン数をカスタマイズ可能
+- 🧪 ドライランモード（お金をかけずにテスト）
 - 🧩 Claude Code・Codex・Gemini CLI・OpenCode 向けSkillファイル同梱
 
 ## クイックスタート
@@ -66,15 +74,15 @@ python burn.py --target 100k --provider gemini --model gemini-1.5-flash
 # DeepSeek（OpenAI互換）
 python burn.py --target 500k --base-url https://api.deepseek.com/v1 --model deepseek-chat
 
-# テストモード
+# テストモード（費用なし）
 python burn.py --target 100k --dry-run
 ```
 
 ## 免責事項
 
-> 本プロジェクトは企業のAI利用KPI評価制度への**風刺的なコメント**であり、教育・娯楽目的のみを意図しています。  
-> AIサービスの不正利用、社内規定への違反、計算資源の浪費を推奨するものではありません。  
-> 責任ある使用をお願いします。
+> 本プロジェクトは、企業のAI使用KPI文化への**風刺**として作られたものです。教育・娯楽目的のみを意図しています。  
+> AIサービスの不正利用・社内規定違反・計算リソースの無駄遣いを推奨するものではありません。  
+> もし本当にトークン数で社員を評価している会社にお勤めなら——問題は岩じゃなく、制度の方かもしれません。
 
 ## ライセンス
 

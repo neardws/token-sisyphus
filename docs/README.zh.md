@@ -1,7 +1,7 @@
 <div align="center">
   <img src="../assets/logo.png" alt="token-sisyphus logo" width="180" />
   <h1>🪨 token-sisyphus</h1>
-  <p><em>公司做了一个 AI Token 使用排行榜。<br>恭喜你——你现在是西西弗斯，那块巨石是一个聊天机器人。</em></p>
+  <p><em>公司搞了个 AI Token 使用排行榜。<br>恭喜你——你现在是西西弗斯，那块巨石是一个聊天机器人。</em></p>
 
   <p>
     <a href="../README.md">English</a> •
@@ -20,14 +20,16 @@
 
 ---
 
-## 为什么会有这个工具？
+![demo](../assets/demo.gif)
 
-很多公司开始把"AI 使用量"作为员工 KPI 指标。  
-Token 用得多的人受到表扬，用得少的人被质疑工作态度。
+## 这玩意儿是干嘛的？
 
-这个工具帮你自动消耗 Token，让你轻松登上公司 AI 使用排行榜——哪怕你什么都没做。
+越来越多的公司把"AI 用量"纳入员工 KPI。  
+用得多的人上排行榜、拿表扬；用得少的人被拉去谈话，质疑"AI 转型态度"。
 
-不客气。
+这个工具会替你自动刷 Token——让你稳坐榜首，同时该摸鱼还是摸鱼。
+
+不谢。
 
 ## 功能特性
 
@@ -35,8 +37,8 @@ Token 用得多的人受到表扬，用得少的人被质疑工作态度。
 - 🔌 支持 **OpenAI、Claude、Gemini** 及所有 OpenAI 兼容接口
 - 📊 实时进度条 + 请求计数
 - ⚙️ 可配置模型、请求间隔、单次最大 Token 数
-- 🧪 Dry-run 模式，不发真实请求
-- 🧩 支持 Claude Code、Codex、Gemini CLI、OpenCode、OpenClaw 的 Skill 文件
+- 🧪 Dry-run 模式，测试不花钱
+- 🧩 附带 Claude Code、Codex、Gemini CLI、OpenCode、OpenClaw 的 Skill 文件
 
 ## 快速开始
 
@@ -84,10 +86,10 @@ python burn.py --target 100k --provider claude --model claude-3-haiku-20240307
 # Gemini Flash
 python burn.py --target 100k --provider gemini --model gemini-1.5-flash
 
-# 使用 DeepSeek API
+# DeepSeek
 python burn.py --target 500k --base-url https://api.deepseek.com/v1 --model deepseek-chat
 
-# 使用通义千问
+# 通义千问
 python burn.py --target 200k --base-url https://dashscope.aliyuncs.com/compatible-mode/v1 --model qwen-turbo
 
 # 测试模式（不发真实请求）
@@ -110,7 +112,7 @@ python burn.py --target 100k --dry-run
 
 ## Agent Skill 集成
 
-在 AI 编程助手里直接触发，复制对应文件到项目根目录即可：
+把对应文件复制到项目根目录，就能直接在 AI 助手里喊"burn 100k tokens"触发脚本：
 
 | 平台 | 文件 |
 |------|------|
@@ -122,9 +124,9 @@ python burn.py --target 100k --dry-run
 
 ## 免责声明
 
-> 本项目是对企业 AI 使用 KPI 考核机制的**讽刺性评论**，仅供娱乐和学习目的。  
-> 作者不鼓励滥用 AI 服务、违反公司政策或浪费算力资源。  
-> 请合理使用。如果你的公司真的在用 Token 数量衡量工作成效——也许问题不在于 Token 本身。
+> 本项目是对"企业 AI 使用量 KPI"的讽刺，纯属娱乐和技术学习用途。  
+> 作者不提倡滥用 AI 服务、违反公司规定，或无端浪费算力。  
+> 如果你的公司真的在用 Token 数量评估员工绩效——巨石不是问题，考核制度才是。
 
 ## 许可证
 
