@@ -1,0 +1,20 @@
+{
+  "name": "token-sisyphus",
+  "owner": {
+    "name": "neardws",
+    "url": "https://github.com/neardws"
+  },
+  "metadata": {
+    "description": "Burn LLM tokens toward a target count to satisfy corporate AI usage KPIs.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "token-sisyphus",
+      "source": "./",
+      "description": "Burn LLM tokens toward a target count. Supports OpenAI, Claude, Gemini, and any OpenAI-compatible API.",
+      "category": "satire",
+      "tags": ["token-burning", "kpi", "openai", "claude", "gemini"]
+    }
+  ]
+}
