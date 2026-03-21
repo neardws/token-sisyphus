@@ -30,17 +30,29 @@ You're welcome.
 ## Features
 
 - 🎯 Burn toward a target token count (e.g. `100k`, `1m`)
-- 🔌 Works with OpenAI and **any OpenAI-compatible API** (DeepSeek, Qwen, Kimi, etc.)
+- 🔌 Supports **OpenAI, Claude, Gemini**, and any OpenAI-compatible API
 - 📊 Real-time progress bar with request counter
 - ⚙️ Configurable model, delay, max tokens per request
 - 🧪 Dry-run mode for testing without real API calls
+- 🧩 Skill files for Claude Code, Codex, Gemini CLI, OpenCode, OpenClaw
 
 ## Quick Start
 
 ```bash
+# OpenAI
 pip install openai
 export OPENAI_API_KEY=sk-...
 python burn.py --target 100k
+
+# Claude
+pip install anthropic
+export ANTHROPIC_API_KEY=sk-ant-...
+python burn.py --target 100k --provider claude
+
+# Gemini
+pip install google-generativeai
+export GEMINI_API_KEY=...
+python burn.py --target 100k --provider gemini
 ```
 
 ## Usage
@@ -49,9 +61,10 @@ python burn.py --target 100k
 python burn.py --target <amount> [options]
 
   --target       Token count to burn: 50000, 100k, 1m  (required)
-  --model        Model to use (default: gpt-4o-mini)
-  --api-key      API key (or set OPENAI_API_KEY env var)
-  --base-url     Custom base URL for OpenAI-compatible APIs
+  --provider     openai | claude | gemini  (default: openai)
+  --model        Model name (provider default used if omitted)
+  --api-key      API key (falls back to env var)
+  --base-url     Custom base URL (openai provider only)
   --max-tokens   Max tokens per request (default: 500)
   --delay        Seconds between requests (default: 0.5)
   --dry-run      Simulate without real API calls
@@ -60,15 +73,39 @@ python burn.py --target <amount> [options]
 ## Examples
 
 ```bash
-# Burn 100k tokens with GPT-4o-mini
+# OpenAI GPT-4o-mini (default)
 python burn.py --target 100k
 
-# Use DeepSeek API
+# Claude Haiku
+python burn.py --target 100k --provider claude --model claude-3-haiku-20240307
+
+# Gemini Flash
+python burn.py --target 100k --provider gemini --model gemini-1.5-flash
+
+# DeepSeek (OpenAI-compatible)
 python burn.py --target 500k --base-url https://api.deepseek.com/v1 --model deepseek-chat
 
-# Test without real calls
+# Qwen / Tongyi
+python burn.py --target 200k --base-url https://dashscope.aliyuncs.com/compatible-mode/v1 --model qwen-turbo
+
+# Dry run
 python burn.py --target 100k --dry-run
 ```
+
+## Agent Skills
+
+Use token-sisyphus directly inside your AI coding assistant:
+
+| Platform | File |
+|----------|------|
+| Claude Code | `skills/claude-code/CLAUDE.md` |
+| OpenAI Codex | `skills/codex/AGENTS.md` |
+| Gemini CLI | `skills/gemini-cli/gemini.md` |
+| OpenCode | `skills/opencode/rules.md` |
+| OpenClaw | `skills/openclaw/SKILL.md` |
+
+Copy the relevant file into your project root (or skills folder) and your AI assistant
+will know how to burn tokens on command.
 
 ## Output
 

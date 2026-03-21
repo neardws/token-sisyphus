@@ -9,17 +9,8 @@ import os
 import sys
 import time
 import random
-from typing import Optional
-
-try:
-    from openai import OpenAI
-except ImportError:
-    print("Error: openai package not found. Run: pip install openai")
-    sys.exit(1)
 
 # ── Prompt pool ──────────────────────────────────────────────────────────────
-# Varied enough to avoid rate-limit pattern detection; meaningless enough to
-# honor the Sisyphean spirit.
 PROMPTS = [
     "Explain the concept of recursion using a metaphor involving mirrors.",
     "What are three underrated programming languages and why?",
@@ -41,130 +32,122 @@ PROMPTS = [
     "What is technical debt and how does it feel physically?",
     "Describe the difference between a bug and a feature in three sentences.",
     "What would git blame say about the meaning of life?",
+    "If computers could dream, what would they dream about?",
+    "Explain the concept of a deadlock using a traffic jam analogy.",
+    "What is the most underrated skill a software engineer can have?",
+    "Write a haiku about cloud computing.",
+    "Describe what happens when you type a URL and press Enter.",
 ]
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(
-        description="token-sisyphus — burn LLM tokens to satisfy your company KPI",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  python burn.py --target 50000
-  python burn.py --target 100k --model gpt-4o-mini
-  python burn.py --target 200k --base-url https://your-api.com/v1 --model your-model
-        """,
-    )
-    parser.add_argument(
-        "--target",
-        required=True,
-        help="Target token count to burn (e.g. 50000 or 100k or 1m)",
-    )
-    parser.add_argument(
-        "--model",
-        default="gpt-4o-mini",
-        help="Model to use (default: gpt-4o-mini)",
-    )
-    parser.add_argument(
-        "--api-key",
-        default=None,
-        help="API key (default: reads from OPENAI_API_KEY env var)",
-    )
-    parser.add_argument(
-        "--base-url",
-        default=None,
-        help="Custom API base URL for OpenAI-compatible endpoints",
-    )
-    parser.add_argument(
-        "--max-tokens",
-        type=int,
-        default=500,
-        help="Max tokens per request (default: 500)",
-    )
-    parser.add_argument(
-        "--delay",
-        type=float,
-        default=0.5,
-        help="Delay between requests in seconds (default: 0.5)",
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Simulate without making real API calls",
-    )
-    return parser.parse_args()
+# ── Provider adapters ─────────────────────────────────────────────────────────
+
+def burn_openai(target, model, api_key, base_url, max_tokens, delay, dry_run):
+    """OpenAI and OpenAI-compatible APIs."""
+    try:
+        from openai import OpenAI
+    except ImportError:
+        print("Error: openai package required. Run: pip install openai")
+        sys.exit(1)
+
+    client = None
+    if not dry_run:
+        kwargs = {"api_key": api_key or os.environ.get("OPENAI_API_KEY", "")}
+        if base_url:
+            kwargs["base_url"] = base_url
+        client = OpenAI(**kwargs)
+
+    def call(prompt):
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=max_tokens,
+        )
+        return resp.usage.total_tokens if resp.usage else max_tokens
+
+    return _run_loop(target, model, delay, dry_run, call)
 
 
-def parse_target(target_str: str) -> int:
-    """Parse target like '100k', '1m', '50000' into integer."""
-    s = target_str.lower().strip()
-    if s.endswith("m"):
-        return int(float(s[:-1]) * 1_000_000)
-    elif s.endswith("k"):
-        return int(float(s[:-1]) * 1_000)
-    else:
-        return int(s)
+def burn_claude(target, model, api_key, max_tokens, delay, dry_run):
+    """Anthropic Claude API."""
+    try:
+        import anthropic
+    except ImportError:
+        print("Error: anthropic package required. Run: pip install anthropic")
+        sys.exit(1)
+
+    client = None
+    if not dry_run:
+        client = anthropic.Anthropic(
+            api_key=api_key or os.environ.get("ANTHROPIC_API_KEY", "")
+        )
+
+    def call(prompt):
+        resp = client.messages.create(
+            model=model,
+            max_tokens=max_tokens,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        usage = resp.usage
+        return (usage.input_tokens + usage.output_tokens) if usage else max_tokens
+
+    return _run_loop(target, model, delay, dry_run, call)
 
 
-def progress_bar(current: int, total: int, width: int = 40) -> str:
-    pct = min(current / total, 1.0)
-    filled = int(width * pct)
-    bar = "█" * filled + "░" * (width - filled)
-    return f"[{bar}] {pct*100:.1f}% ({current:,} / {total:,} tokens)"
+def burn_gemini(target, model, api_key, max_tokens, delay, dry_run):
+    """Google Gemini API."""
+    try:
+        import google.generativeai as genai
+    except ImportError:
+        print("Error: google-generativeai package required. Run: pip install google-generativeai")
+        sys.exit(1)
+
+    if not dry_run:
+        genai.configure(api_key=api_key or os.environ.get("GEMINI_API_KEY", ""))
+        gemini_model = genai.GenerativeModel(model)
+
+    def call(prompt):
+        resp = gemini_model.generate_content(
+            prompt,
+            generation_config=genai.GenerationConfig(max_output_tokens=max_tokens),
+        )
+        usage = resp.usage_metadata
+        if usage:
+            return usage.prompt_token_count + usage.candidates_token_count
+        return max_tokens
+
+    return _run_loop(target, model, delay, dry_run, call)
 
 
-def burn(args):
-    target = parse_target(args.target)
-    api_key = args.api_key or os.environ.get("OPENAI_API_KEY", "sk-placeholder")
+# ── Core loop ─────────────────────────────────────────────────────────────────
 
-    client_kwargs = {"api_key": api_key}
-    if args.base_url:
-        client_kwargs["base_url"] = args.base_url
-
-    if not args.dry_run:
-        client = OpenAI(**client_kwargs)
-
+def _run_loop(target, model, delay, dry_run, call_fn):
     total_tokens = 0
     request_count = 0
     start_time = time.time()
-
-    print(f"\n🪨  token-sisyphus starting...")
-    print(f"    Target : {target:,} tokens")
-    print(f"    Model  : {args.model}")
-    if args.dry_run:
-        print(f"    Mode   : DRY RUN (no real API calls)\n")
-    else:
-        print(f"    Mode   : LIVE\n")
 
     try:
         while total_tokens < target:
             prompt = random.choice(PROMPTS)
             request_count += 1
 
-            if args.dry_run:
-                # Simulate ~200-600 tokens per request
+            if dry_run:
                 used = random.randint(200, 600)
                 total_tokens += used
             else:
                 try:
-                    resp = client.chat.completions.create(
-                        model=args.model,
-                        messages=[{"role": "user", "content": prompt}],
-                        max_tokens=args.max_tokens,
-                    )
-                    used = resp.usage.total_tokens if resp.usage else args.max_tokens
+                    used = call_fn(prompt)
                     total_tokens += used
                 except Exception as e:
                     print(f"\n  ⚠️  Request {request_count} failed: {e}")
                     time.sleep(2)
                     continue
 
-            # Print progress (overwrite line)
-            bar = progress_bar(total_tokens, target)
+            bar = _progress_bar(total_tokens, target)
             print(f"\r  {bar}  req#{request_count}", end="", flush=True)
 
             if total_tokens < target:
-                time.sleep(args.delay)
+                time.sleep(delay)
 
     except KeyboardInterrupt:
         print("\n\n  Interrupted.")
@@ -178,6 +161,102 @@ def burn(args):
     print(f"\n    Your boulder has reached the top. See you tomorrow.\n")
 
 
-if __name__ == "__main__":
+def _progress_bar(current: int, total: int, width: int = 40) -> str:
+    pct = min(current / total, 1.0)
+    filled = int(width * pct)
+    bar = "█" * filled + "░" * (width - filled)
+    return f"[{bar}] {pct*100:.1f}% ({current:,} / {total:,} tokens)"
+
+
+def parse_target(s: str) -> int:
+    s = s.lower().strip()
+    if s.endswith("m"):
+        return int(float(s[:-1]) * 1_000_000)
+    elif s.endswith("k"):
+        return int(float(s[:-1]) * 1_000)
+    return int(s)
+
+
+# ── CLI ───────────────────────────────────────────────────────────────────────
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="token-sisyphus — burn LLM tokens to satisfy your company KPI",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Providers:
+  openai    OpenAI and any OpenAI-compatible API (default)
+  claude    Anthropic Claude
+  gemini    Google Gemini
+
+Examples:
+  python burn.py --target 100k
+  python burn.py --target 100k --provider claude --model claude-3-haiku-20240307
+  python burn.py --target 100k --provider gemini --model gemini-1.5-flash
+  python burn.py --target 500k --base-url https://api.deepseek.com/v1 --model deepseek-chat
+  python burn.py --target 100k --dry-run
+        """,
+    )
+    parser.add_argument("--target", required=True,
+        help="Token count to burn: 50000, 100k, 1m")
+    parser.add_argument("--provider", default="openai",
+        choices=["openai", "claude", "gemini"],
+        help="API provider (default: openai)")
+    parser.add_argument("--model", default=None,
+        help="Model name (provider default used if omitted)")
+    parser.add_argument("--api-key", default=None,
+        help="API key (falls back to provider env var)")
+    parser.add_argument("--base-url", default=None,
+        help="Custom base URL (openai provider only)")
+    parser.add_argument("--max-tokens", type=int, default=500,
+        help="Max tokens per request (default: 500)")
+    parser.add_argument("--delay", type=float, default=0.5,
+        help="Delay between requests in seconds (default: 0.5)")
+    parser.add_argument("--dry-run", action="store_true",
+        help="Simulate without real API calls")
+    return parser.parse_args()
+
+
+PROVIDER_DEFAULTS = {
+    "openai":  "gpt-4o-mini",
+    "claude":  "claude-3-haiku-20240307",
+    "gemini":  "gemini-1.5-flash",
+}
+
+ENV_VARS = {
+    "openai":  "OPENAI_API_KEY",
+    "claude":  "ANTHROPIC_API_KEY",
+    "gemini":  "GEMINI_API_KEY",
+}
+
+
+def main():
     args = parse_args()
-    burn(args)
+    target = parse_target(args.target)
+    model = args.model or PROVIDER_DEFAULTS[args.provider]
+
+    print(f"\n🪨  token-sisyphus starting...")
+    print(f"    Provider : {args.provider}")
+    print(f"    Target   : {target:,} tokens")
+    print(f"    Model    : {model}")
+    if args.dry_run:
+        print(f"    Mode     : DRY RUN (no real API calls)\n")
+    else:
+        env_var = ENV_VARS[args.provider]
+        key_src = "--api-key" if args.api_key else f"${env_var}"
+        print(f"    API key  : {key_src}")
+        print(f"    Mode     : LIVE\n")
+
+    if args.provider == "openai":
+        burn_openai(target, model, args.api_key, args.base_url,
+                    args.max_tokens, args.delay, args.dry_run)
+    elif args.provider == "claude":
+        burn_claude(target, model, args.api_key,
+                    args.max_tokens, args.delay, args.dry_run)
+    elif args.provider == "gemini":
+        burn_gemini(target, model, args.api_key,
+                    args.max_tokens, args.delay, args.dry_run)
+
+
+if __name__ == "__main__":
+    main()
