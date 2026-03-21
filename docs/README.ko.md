@@ -26,29 +26,47 @@
 ## 기능
 
 - 🎯 목표 토큰 수까지 소비 (예: `100k`, `1m`)
-- 🔌 OpenAI 및 모든 OpenAI 호환 API 지원
+- 🔌 **OpenAI, Claude, Gemini** 및 모든 OpenAI 호환 API 지원
 - 📊 실시간 진행 막대
 - ⚙️ 모델, 딜레이, 최대 토큰 수 설정 가능
 - 🧪 드라이런 모드 (실제 API 호출 없음)
+- 🧩 Claude Code, Codex, Gemini CLI, OpenCode 용 Skill 파일 포함
 
 ## 빠른 시작
 
 ```bash
+# OpenAI
 pip install openai
 export OPENAI_API_KEY=sk-...
 python burn.py --target 100k
+
+# Claude
+pip install anthropic
+export ANTHROPIC_API_KEY=sk-ant-...
+python burn.py --target 100k --provider claude
+
+# Gemini
+pip install google-generativeai
+export GEMINI_API_KEY=...
+python burn.py --target 100k --provider gemini
 ```
 
 ## 사용 예시
 
 ```bash
-# 100k 토큰 소비
+# OpenAI (기본값)
 python burn.py --target 100k
 
-# 커스텀 API 엔드포인트 사용
+# Claude Haiku
+python burn.py --target 100k --provider claude --model claude-3-haiku-20240307
+
+# Gemini Flash
+python burn.py --target 100k --provider gemini --model gemini-1.5-flash
+
+# DeepSeek (OpenAI 호환)
 python burn.py --target 500k --base-url https://api.deepseek.com/v1 --model deepseek-chat
 
-# 테스트 모드 (실제 API 호출 없음)
+# 테스트 모드
 python burn.py --target 100k --dry-run
 ```
 

@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install openai
+
+      - name: Run smoke test before release
+        run: python burn.py --target 5k --dry-run
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Create release archive
+        run: |
+          zip -r token-sisyphus-${{ steps.version.outputs.version }}.zip \
+            burn.py README.md docs/ skills/ assets/ \
+            --exclude "*.pyc" --exclude "__pycache__/*" --exclude ".venv/*"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "🪨 token-sisyphus ${{ steps.version.outputs.version }}"
+          body: |
+            ## What's in this release
+
+            See [CHANGELOG](https://github.com/neardws/token-sisyphus/blob/main/CHANGELOG.md) for details.
+
+            ## Quick install
+
+            ```bash
+            # Download and run
+            curl -O https://github.com/neardws/token-sisyphus/releases/download/${{ steps.version.outputs.version }}/token-sisyphus-${{ steps.version.outputs.version }}.zip
+            unzip token-sisyphus-*.zip
+            pip install openai   # or anthropic / google-generativeai
+            python burn.py --target 100k --dry-run
+            ```
+
+            ## Providers supported
+            - OpenAI / any OpenAI-compatible API
+            - Anthropic Claude
+            - Google Gemini
+          files: token-sisyphus-${{ steps.version.outputs.version }}.zip
+          draft: false
+          prerelease: false

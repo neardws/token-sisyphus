@@ -30,17 +30,29 @@ Token 用得多的人受到表扬，用得少的人被质疑工作态度。
 ## 功能特性
 
 - 🎯 按目标 Token 数量消耗（如 `100k`、`1m`）
-- 🔌 支持 OpenAI 及所有兼容接口（DeepSeek、通义、Kimi 等）
+- 🔌 支持 **OpenAI、Claude、Gemini** 及所有 OpenAI 兼容接口
 - 📊 实时进度条 + 请求计数
 - ⚙️ 可配置模型、请求间隔、单次最大 Token 数
 - 🧪 Dry-run 模式，不发真实请求
+- 🧩 支持 Claude Code、Codex、Gemini CLI、OpenCode、OpenClaw 的 Skill 文件
 
 ## 快速开始
 
 ```bash
+# OpenAI
 pip install openai
 export OPENAI_API_KEY=sk-...
 python burn.py --target 100k
+
+# Claude
+pip install anthropic
+export ANTHROPIC_API_KEY=sk-ant-...
+python burn.py --target 100k --provider claude
+
+# Gemini
+pip install google-generativeai
+export GEMINI_API_KEY=...
+python burn.py --target 100k --provider gemini
 ```
 
 ## 使用方式
@@ -49,9 +61,10 @@ python burn.py --target 100k
 python burn.py --target <数量> [选项]
 
   --target       目标 Token 数：50000、100k、1m（必填）
-  --model        使用的模型（默认：gpt-4o-mini）
-  --api-key      API Key（或设置 OPENAI_API_KEY 环境变量）
-  --base-url     自定义 API 地址（OpenAI 兼容接口）
+  --provider     openai | claude | gemini（默认：openai）
+  --model        模型名称（省略则使用各 provider 默认值）
+  --api-key      API Key（或设置对应环境变量）
+  --base-url     自定义 API 地址（仅 openai provider）
   --max-tokens   每次请求最大 Token 数（默认：500）
   --delay        请求间隔秒数（默认：0.5）
   --dry-run      模拟模式，不发真实请求
@@ -60,8 +73,14 @@ python burn.py --target <数量> [选项]
 ## 使用示例
 
 ```bash
-# 消耗 100k tokens
+# OpenAI GPT-4o-mini（默认）
 python burn.py --target 100k
+
+# Claude Haiku
+python burn.py --target 100k --provider claude --model claude-3-haiku-20240307
+
+# Gemini Flash
+python burn.py --target 100k --provider gemini --model gemini-1.5-flash
 
 # 使用 DeepSeek API
 python burn.py --target 500k --base-url https://api.deepseek.com/v1 --model deepseek-chat
@@ -75,15 +94,29 @@ python burn.py --target 100k --dry-run
 
 ## 兼容的 API
 
-| 服务商 | --base-url |
-|--------|------------|
-| OpenAI | （默认） |
-| DeepSeek | `https://api.deepseek.com/v1` |
-| 通义千问 | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
-| Moonshot / Kimi | `https://api.moonshot.cn/v1` |
-| 智谱 / GLM | `https://open.bigmodel.cn/api/paas/v4` |
-| Azure OpenAI | 你的 Azure 地址 |
-| vLLM / Ollama | 你的自托管地址 |
+| 服务商 | provider | --base-url |
+|--------|----------|------------|
+| OpenAI | `openai` | （默认） |
+| Anthropic Claude | `claude` | — |
+| Google Gemini | `gemini` | — |
+| DeepSeek | `openai` | `https://api.deepseek.com/v1` |
+| 通义千问 | `openai` | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
+| Moonshot / Kimi | `openai` | `https://api.moonshot.cn/v1` |
+| 智谱 / GLM | `openai` | `https://open.bigmodel.cn/api/paas/v4` |
+| Azure OpenAI | `openai` | 你的 Azure 地址 |
+| vLLM / Ollama | `openai` | 你的自托管地址 |
+
+## Agent Skill 集成
+
+在 AI 编程助手里直接触发，复制对应文件到项目根目录即可：
+
+| 平台 | 文件 |
+|------|------|
+| Claude Code | `skills/claude-code/CLAUDE.md` |
+| OpenAI Codex | `skills/codex/AGENTS.md` |
+| Gemini CLI | `skills/gemini-cli/gemini.md` |
+| OpenCode | `skills/opencode/rules.md` |
+| OpenClaw | `skills/openclaw/SKILL.md` |
 
 ## 免责声明
 

@@ -26,29 +26,47 @@
 ## 機能
 
 - 🎯 目標トークン数に向けて消費（例：`100k`、`1m`）
-- 🔌 OpenAIおよびすべてのOpenAI互換API対応
+- 🔌 **OpenAI・Claude・Gemini** およびすべてのOpenAI互換API対応
 - 📊 リアルタイムプログレスバー
 - ⚙️ モデル・遅延・最大トークン数の設定可能
 - 🧪 ドライランモード（実際のAPIコールなし）
+- 🧩 Claude Code・Codex・Gemini CLI・OpenCode 向けSkillファイル同梱
 
 ## クイックスタート
 
 ```bash
+# OpenAI
 pip install openai
 export OPENAI_API_KEY=sk-...
 python burn.py --target 100k
+
+# Claude
+pip install anthropic
+export ANTHROPIC_API_KEY=sk-ant-...
+python burn.py --target 100k --provider claude
+
+# Gemini
+pip install google-generativeai
+export GEMINI_API_KEY=...
+python burn.py --target 100k --provider gemini
 ```
 
 ## 使用例
 
 ```bash
-# 100kトークンを消費
+# OpenAI（デフォルト）
 python burn.py --target 100k
 
-# カスタムAPIエンドポイントを使用
+# Claude Haiku
+python burn.py --target 100k --provider claude --model claude-3-haiku-20240307
+
+# Gemini Flash
+python burn.py --target 100k --provider gemini --model gemini-1.5-flash
+
+# DeepSeek（OpenAI互換）
 python burn.py --target 500k --base-url https://api.deepseek.com/v1 --model deepseek-chat
 
-# テストモード（実際のAPIコールなし）
+# テストモード
 python burn.py --target 100k --dry-run
 ```
 

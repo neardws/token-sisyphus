@@ -26,26 +26,44 @@ De nada.
 ## Características
 
 - 🎯 Consumir hasta un número objetivo de tokens (ej: `100k`, `1m`)
-- 🔌 Compatible con OpenAI y cualquier API compatible con OpenAI
+- 🔌 Compatible con **OpenAI, Claude, Gemini** y cualquier API compatible con OpenAI
 - 📊 Barra de progreso en tiempo real
 - ⚙️ Modelo, retraso y tokens máximos configurables
 - 🧪 Modo simulación sin llamadas API reales
+- 🧩 Archivos Skill para Claude Code, Codex, Gemini CLI, OpenCode
 
 ## Inicio rápido
 
 ```bash
+# OpenAI
 pip install openai
 export OPENAI_API_KEY=sk-...
 python burn.py --target 100k
+
+# Claude
+pip install anthropic
+export ANTHROPIC_API_KEY=sk-ant-...
+python burn.py --target 100k --provider claude
+
+# Gemini
+pip install google-generativeai
+export GEMINI_API_KEY=...
+python burn.py --target 100k --provider gemini
 ```
 
 ## Ejemplos
 
 ```bash
-# Consumir 100k tokens
+# OpenAI (por defecto)
 python burn.py --target 100k
 
-# Usar un endpoint compatible con OpenAI
+# Claude Haiku
+python burn.py --target 100k --provider claude --model claude-3-haiku-20240307
+
+# Gemini Flash
+python burn.py --target 100k --provider gemini --model gemini-1.5-flash
+
+# DeepSeek (compatible OpenAI)
 python burn.py --target 500k --base-url https://api.deepseek.com/v1 --model deepseek-chat
 
 # Modo simulación
