@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-llm-sisyphus: Your company built a leaderboard for AI token usage.
+token-sisyphus: Your company built a leaderboard for AI token usage.
 Congratulations — you are now Sisyphus, and the boulder is a chatbot.
 """
 
@@ -46,7 +46,7 @@ PROMPTS = [
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="llm-sisyphus — burn LLM tokens to satisfy your company KPI",
+        description="token-sisyphus — burn LLM tokens to satisfy your company KPI",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -128,7 +128,7 @@ def burn(args):
     request_count = 0
     start_time = time.time()
 
-    print(f"\n🪨  llm-sisyphus starting...")
+    print(f"\n🪨  token-sisyphus starting...")
     print(f"    Target : {target:,} tokens")
     print(f"    Model  : {args.model}")
     if args.dry_run:

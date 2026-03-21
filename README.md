@@ -1,4 +1,4 @@
-# 🪨 llm-sisyphus
+# 🪨 token-sisyphus
 
 > Your company built a leaderboard for AI token usage.  
 > Congratulations — you are now Sisyphus, and the boulder is a chatbot.
@@ -85,7 +85,7 @@ Any OpenAI-compatible endpoint works:
 ## Output
 
 ```
-🪨  llm-sisyphus starting...
+🪨  token-sisyphus starting...
     Target : 100,000 tokens
     Model  : gpt-4o-mini
     Mode   : LIVE
