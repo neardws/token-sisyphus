@@ -10,6 +10,7 @@ import os
 import sys
 import time
 import random
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # ── Prompt pool ──────────────────────────────────────────────────────────────
 PROMPTS = [
@@ -43,7 +44,7 @@ PROMPTS = [
 
 # ── Provider adapters ─────────────────────────────────────────────────────────
 
-def burn_openai(target, model, api_key, base_url, max_tokens, delay, dry_run, use_responses_api=False, output_format=None, provider="openai"):
+def burn_openai(target, model, api_key, base_url, max_tokens, delay, dry_run, use_responses_api=False, output_format=None, provider="openai", concurrency=1):
     """OpenAI and OpenAI-compatible APIs. Supports both chat/completions and Responses API."""
     try:
         from openai import OpenAI
@@ -79,10 +80,10 @@ def burn_openai(target, model, api_key, base_url, max_tokens, delay, dry_run, us
             )
             return resp.usage.total_tokens if resp.usage else max_tokens
 
-    return _run_loop(target, model, delay, dry_run, call, output_format=output_format, provider=provider)
+    return _run_loop(target, model, delay, dry_run, call, output_format=output_format, provider=provider, concurrency=concurrency)
 
 
-def burn_claude(target, model, api_key, max_tokens, delay, dry_run, output_format=None, provider="claude"):
+def burn_claude(target, model, api_key, max_tokens, delay, dry_run, output_format=None, provider="claude", concurrency=1):
     """Anthropic Claude API."""
     try:
         import anthropic
@@ -105,10 +106,10 @@ def burn_claude(target, model, api_key, max_tokens, delay, dry_run, output_forma
         usage = resp.usage
         return (usage.input_tokens + usage.output_tokens) if usage else max_tokens
 
-    return _run_loop(target, model, delay, dry_run, call, output_format=output_format, provider=provider)
+    return _run_loop(target, model, delay, dry_run, call, output_format=output_format, provider=provider, concurrency=concurrency)
 
 
-def burn_gemini(target, model, api_key, max_tokens, delay, dry_run, output_format=None, provider="gemini"):
+def burn_gemini(target, model, api_key, max_tokens, delay, dry_run, output_format=None, provider="gemini", concurrency=1):
     """Google Gemini API."""
     try:
         import google.generativeai as genai
@@ -130,39 +131,71 @@ def burn_gemini(target, model, api_key, max_tokens, delay, dry_run, output_forma
             return usage.prompt_token_count + usage.candidates_token_count
         return max_tokens
 
-    return _run_loop(target, model, delay, dry_run, call, output_format=output_format, provider=provider)
+    return _run_loop(target, model, delay, dry_run, call, output_format=output_format, provider=provider, concurrency=concurrency)
 
 
 # ── Core loop ─────────────────────────────────────────────────────────────────
 
-def _run_loop(target, model, delay, dry_run, call_fn, output_format=None, provider=None):
+def _run_loop(target, model, delay, dry_run, call_fn, output_format=None, provider=None, concurrency=1):
     total_tokens = 0
     request_count = 0
     start_time = time.time()
 
     try:
-        while total_tokens < target:
-            prompt = random.choice(PROMPTS)
-            request_count += 1
+        if concurrency <= 1:
+            while total_tokens < target:
+                prompt = random.choice(PROMPTS)
+                request_count += 1
 
-            if dry_run:
-                used = random.randint(200, 600)
-                total_tokens += used
-            else:
-                try:
-                    used = call_fn(prompt)
+                if dry_run:
+                    used = random.randint(200, 600)
                     total_tokens += used
-                except Exception as e:
-                    print(f"\n  ⚠️  Request {request_count} failed: {e}")
-                    time.sleep(2)
-                    continue
+                else:
+                    try:
+                        used = call_fn(prompt)
+                        total_tokens += used
+                    except Exception as e:
+                        print(f"\n  ⚠️  Request {request_count} failed: {e}")
+                        time.sleep(2)
+                        continue
 
-            if output_format != "json":
-                bar = _progress_bar(total_tokens, target)
-                print(f"\r  {bar}  req#{request_count}", end="", flush=True)
+                if output_format != "json":
+                    bar = _progress_bar(total_tokens, target)
+                    print(f"\r  {bar}  req#{request_count}", end="", flush=True)
 
-            if total_tokens < target:
-                time.sleep(delay)
+                if total_tokens < target:
+                    time.sleep(delay)
+        else:
+            with ThreadPoolExecutor(max_workers=concurrency) as executor:
+                while total_tokens < target:
+                    batch_size = concurrency
+                    futures = {}
+                    for _ in range(batch_size):
+                        prompt = random.choice(PROMPTS)
+                        if dry_run:
+                            future = executor.submit(random.randint, 200, 600)
+                        else:
+                            future = executor.submit(call_fn, prompt)
+                        futures[future] = None
+
+                    batch_tokens = 0
+                    for future in as_completed(futures):
+                        request_count += 1
+                        try:
+                            used = future.result()
+                            total_tokens += used
+                            batch_tokens += used
+                        except Exception as e:
+                            print(f"\n  ⚠️  Request {request_count} failed: {e}")
+
+                        if output_format != "json":
+                            bar = _progress_bar(total_tokens, target)
+                            print(f"\r  {bar}  req#{request_count}", end="", flush=True)
+
+                    if batch_tokens == 0:
+                        time.sleep(2)
+                    elif total_tokens < target:
+                        time.sleep(delay)
 
     except KeyboardInterrupt:
         if output_format != "json":
@@ -243,10 +276,12 @@ Examples:
     parser.add_argument("--api", default="completions",
         choices=["completions", "responses"],
         help="OpenAI API type: completions (default) or responses (for gpt-5.x / codex)")
-    parser.add_argument("--max-tokens", type=int, default=500,
-        help="Max tokens per request (default: 500)")
+    parser.add_argument("--max-tokens", type=int, default=2000,
+        help="Max tokens per request (default: 2000)")
     parser.add_argument("--delay", type=float, default=0.5,
         help="Delay between requests in seconds (default: 0.5)")
+    parser.add_argument("--concurrency", type=int, default=1,
+        help="Number of parallel requests (default: 1)")
     parser.add_argument("--schedule", type=float, default=0,
         help="Run continuously, starting a new burn cycle every N minutes; 0 means disabled")
     parser.add_argument("--dry-run", action="store_true",
@@ -273,6 +308,8 @@ def main():
     args = parse_args()
     if args.schedule < 0:
         raise SystemExit("Error: --schedule must be >= 0")
+    if args.concurrency < 1:
+        raise SystemExit("Error: --concurrency must be >= 1")
     if 0 < args.schedule < 0.1:
         raise SystemExit("Error: --schedule must be 0 or at least 0.1 minutes")
     target = parse_target(args.target)
@@ -298,15 +335,18 @@ def main():
             burn_openai(target, model, args.api_key, args.base_url,
                         args.max_tokens, args.delay, args.dry_run,
                         use_responses_api=(args.api == "responses"),
-                        output_format=args.output, provider=args.provider)
+                        output_format=args.output, provider=args.provider,
+                        concurrency=args.concurrency)
         elif args.provider == "claude":
             burn_claude(target, model, args.api_key,
                         args.max_tokens, args.delay, args.dry_run,
-                        output_format=args.output, provider=args.provider)
+                        output_format=args.output, provider=args.provider,
+                        concurrency=args.concurrency)
         elif args.provider == "gemini":
             burn_gemini(target, model, args.api_key,
                         args.max_tokens, args.delay, args.dry_run,
-                        output_format=args.output, provider=args.provider)
+                        output_format=args.output, provider=args.provider,
+                        concurrency=args.concurrency)
 
     while True:
         try:
