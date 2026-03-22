@@ -103,11 +103,22 @@ Use token-sisyphus directly inside your AI coding assistant:
 
 | Platform | File | Install |
 |----------|------|---------|
-| Claude Code | `skills/claude-code/CLAUDE.md` | Copy to project root |
+| Claude Code | Plugin | `/marketplace add neardws/token-sisyphus` then `/plugin install token-sisyphus` |
+| Claude Code (manual) | `skills/claude-code/CLAUDE.md` | Copy to project root |
 | OpenAI Codex | `skills/codex/AGENTS.md` | Copy to project root |
 | Gemini CLI | `skills/gemini-cli/gemini.md` | Copy to project root |
 | OpenCode | `skills/opencode/rules.md` | Copy to project root |
 | OpenClaw | `skills/openclaw/SKILL.md` | `clawhub install token-sisyphus` |
+
+**Claude Code users** can install as a plugin (recommended):
+
+```bash
+/marketplace add neardws/token-sisyphus
+/plugin install token-sisyphus
+```
+
+Or copy `skills/claude-code/CLAUDE.md` to your project root for manual setup.
+
 
 **OpenClaw users** can install directly from [ClawHub](https://clawhub.ai/skills/token-sisyphus):
 
