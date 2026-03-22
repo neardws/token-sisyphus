@@ -42,8 +42,8 @@ PROMPTS = [
 
 # ── Provider adapters ─────────────────────────────────────────────────────────
 
-def burn_openai(target, model, api_key, base_url, max_tokens, delay, dry_run):
-    """OpenAI and OpenAI-compatible APIs."""
+def burn_openai(target, model, api_key, base_url, max_tokens, delay, dry_run, use_responses_api=False):
+    """OpenAI and OpenAI-compatible APIs. Supports both chat/completions and Responses API."""
     try:
         from openai import OpenAI
     except ImportError:
@@ -57,13 +57,26 @@ def burn_openai(target, model, api_key, base_url, max_tokens, delay, dry_run):
             kwargs["base_url"] = base_url
         client = OpenAI(**kwargs)
 
-    def call(prompt):
-        resp = client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=max_tokens,
-        )
-        return resp.usage.total_tokens if resp.usage else max_tokens
+    if use_responses_api:
+        def call(prompt):
+            resp = client.responses.create(
+                model=model,
+                input=prompt,
+                max_output_tokens=max_tokens,
+            )
+            usage = resp.usage
+            if usage:
+                return (getattr(usage, 'input_tokens', 0) +
+                        getattr(usage, 'output_tokens', 0))
+            return max_tokens
+    else:
+        def call(prompt):
+            resp = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=max_tokens,
+            )
+            return resp.usage.total_tokens if resp.usage else max_tokens
 
     return _run_loop(target, model, delay, dry_run, call)
 
@@ -208,10 +221,15 @@ Examples:
         help="API key (falls back to provider env var)")
     parser.add_argument("--base-url", default=None,
         help="Custom base URL (openai provider only)")
+    parser.add_argument("--api", default="completions",
+        choices=["completions", "responses"],
+        help="OpenAI API type: completions (default) or responses (for gpt-5.x / codex)")
     parser.add_argument("--max-tokens", type=int, default=500,
         help="Max tokens per request (default: 500)")
     parser.add_argument("--delay", type=float, default=0.5,
         help="Delay between requests in seconds (default: 0.5)")
+    parser.add_argument("--schedule", type=float, default=0,
+        help="Run continuously, starting a new burn cycle every N minutes; 0 means disabled")
     parser.add_argument("--dry-run", action="store_true",
         help="Simulate without real API calls")
     return parser.parse_args()
@@ -232,6 +250,10 @@ ENV_VARS = {
 
 def main():
     args = parse_args()
+    if args.schedule < 0:
+        raise SystemExit("Error: --schedule must be >= 0")
+    if 0 < args.schedule < 0.1:
+        raise SystemExit("Error: --schedule must be 0 or at least 0.1 minutes")
     target = parse_target(args.target)
     model = args.model or PROVIDER_DEFAULTS[args.provider]
 
@@ -239,6 +261,8 @@ def main():
     print(f"    Provider : {args.provider}")
     print(f"    Target   : {target:,} tokens")
     print(f"    Model    : {model}")
+    if args.schedule > 0:
+        print(f"    Schedule : every {args.schedule:g} minutes")
     if args.dry_run:
         print(f"    Mode     : DRY RUN (no real API calls)\n")
     else:
@@ -247,15 +271,28 @@ def main():
         print(f"    API key  : {key_src}")
         print(f"    Mode     : LIVE\n")
 
-    if args.provider == "openai":
-        burn_openai(target, model, args.api_key, args.base_url,
-                    args.max_tokens, args.delay, args.dry_run)
-    elif args.provider == "claude":
-        burn_claude(target, model, args.api_key,
-                    args.max_tokens, args.delay, args.dry_run)
-    elif args.provider == "gemini":
-        burn_gemini(target, model, args.api_key,
-                    args.max_tokens, args.delay, args.dry_run)
+    def run_once():
+        if args.provider == "openai":
+            burn_openai(target, model, args.api_key, args.base_url,
+                        args.max_tokens, args.delay, args.dry_run,
+                        use_responses_api=(args.api == "responses"))
+        elif args.provider == "claude":
+            burn_claude(target, model, args.api_key,
+                        args.max_tokens, args.delay, args.dry_run)
+        elif args.provider == "gemini":
+            burn_gemini(target, model, args.api_key,
+                        args.max_tokens, args.delay, args.dry_run)
+
+    while True:
+        try:
+            run_once()
+            if args.schedule == 0:
+                break
+            print(f"⏲️  Next burn cycle starts in {args.schedule:g} minutes. Press Ctrl+C to stop.")
+            time.sleep(args.schedule * 60)
+        except KeyboardInterrupt:
+            print("\n\nStopped by user.")
+            break
 
 
 if __name__ == "__main__":
