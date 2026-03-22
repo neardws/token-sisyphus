@@ -102,10 +102,15 @@ def call(client, model, system, user, label="", token_counter=None, use_response
             input=f"{system}\n\n{user}",
             max_output_tokens=4000,
         )
-        text = resp.output_text or ""
-        usage = resp.usage
-        tokens = ((getattr(usage, 'input_tokens', 0) +
-                   getattr(usage, 'output_tokens', 0)) if usage else 0)
+        # SDK may return str on some proxy implementations — fall through to attr access
+        if isinstance(resp, str):
+            text = resp
+            tokens = 0
+        else:
+            text = resp.output_text or ""
+            usage = resp.usage
+            tokens = ((getattr(usage, 'input_tokens', 0) +
+                       getattr(usage, 'output_tokens', 0)) if usage else 0)
     else:
         resp = client.chat.completions.create(
             model=model,
@@ -190,6 +195,57 @@ def apply_search_replace(original: str, patch_text: str) -> tuple[str, int]:
 
 # ── Agents ────────────────────────────────────────────────────────────────────
 
+def agent_pm(client, model, wish, source_code, token_counter, dry_run, use_responses_api=False):
+    """PM Agent: decompose a complex wish into ordered single-point sub-tasks."""
+    print("\n[0/4] 🎯  PM — decomposing wish into atomic sub-tasks")
+    if dry_run:
+        print("  → (dry run, skipping)")
+        return [wish]
+
+    system = textwrap.dedent("""
+        You are a technical product manager reviewing a feature request for a Python CLI tool.
+        Your job: decompose the wish into an ordered list of ATOMIC sub-tasks.
+
+        Rules:
+        - Each sub-task must touch at most 1-2 locations in the source code
+        - Each sub-task must be independently implementable via a single SEARCH/REPLACE patch
+        - Order them by dependency (earlier tasks may be required by later ones)
+        - If the wish is already atomic (single location change), return it as-is as one task
+        - Format: return a numbered list, one task per line, starting with "1. ", "2. ", etc.
+        - Each task description must be specific enough that a developer knows exactly which lines to change
+        - Maximum 5 sub-tasks
+
+        Example output for "add --output json flag":
+        1. Add `parser.add_argument('--output', choices=['json'], default=None)` in parse_args() after the last add_argument call
+        2. Add `start_time = time.time()` in main() on the line before `while True:`
+        3. Add JSON summary print in main() right after the `while True:` loop ends: `if args.output == 'json': print(json.dumps({...}))`
+    """)
+    user = (
+        f"Feature wish: {wish}\n\n"
+        f"Current source:\n```python\n{source_code}\n```\n\n"
+        "Output the numbered sub-task list:"
+    )
+    result = call(client, model, system, user, "decomposing wish", token_counter, use_responses_api)
+
+    # Parse numbered list into sub-tasks
+    sub_tasks = []
+    for line in result.splitlines():
+        line = line.strip()
+        import re
+        m = re.match(r'^\d+\.\s+(.+)$', line)
+        if m:
+            sub_tasks.append(m.group(1).strip())
+
+    if not sub_tasks:
+        # fallback: treat whole wish as one task
+        sub_tasks = [wish]
+
+    print(f"  → {len(sub_tasks)} sub-task(s) identified")
+    for i, t in enumerate(sub_tasks, 1):
+        print(f"      {i}. {t[:80]}{'...' if len(t) > 80 else ''}")
+    return sub_tasks
+
+
 def agent_architect(client, model, wish, source_code, token_counter, dry_run, use_responses_api=False):
     print("\n[1/4] 🏗  Architect — analyzing wish and designing solution")
     if dry_run:
@@ -236,6 +292,7 @@ def agent_coder(client, model, wish, source_code, design_plan, token_counter, dr
         - NEVER write recursive calls (a function calling itself)
         - Loop logic must use while/for, not recursion
         - New scheduling logic must go inside main(), not in a separate helper that calls main()
+        - If the feature requires changes in MULTIPLE places (argparse + function body + main), output ALL of them as separate SEARCH/REPLACE blocks — do NOT omit any part
     """)
     user = (
         f"Design plan:\n{design_plan}\n\n"
@@ -364,56 +421,76 @@ def main():
     client = None if args.dry_run else make_client(args.api_key, args.base_url)
     use_responses = (args.api == "responses")
 
+    # PM: decompose wish into atomic sub-tasks
+    sub_tasks = agent_pm(client, args.model, args.wish, original_source, token_counter, args.dry_run, use_responses)
+
     source_code = original_source
-    final_diff = None
-    final_patched = None
+    all_diffs = []
+    all_designs = []
+    all_reviews = []
+    all_tests = []
 
-    for attempt in range(1, MAX_RETRIES + 1):
-        design   = agent_architect(client, args.model, args.wish, source_code, token_counter, args.dry_run, use_responses)
-        diff_raw = agent_coder(client, args.model, args.wish, source_code, design, token_counter, args.dry_run, use_responses)
-        review   = agent_reviewer(client, args.model, args.wish, source_code, diff_raw, token_counter, args.dry_run, use_responses)
-        tests    = agent_tester(client, args.model, args.wish, diff_raw, token_counter, args.dry_run, use_responses)
+    for task_idx, sub_wish in enumerate(sub_tasks, 1):
+        if len(sub_tasks) > 1:
+            print(f"\n{'─'*60}")
+            print(f"  Sub-task {task_idx}/{len(sub_tasks)}: {sub_wish[:70]}{'...' if len(sub_wish)>70 else ''}")
 
-        passed = args.dry_run or review.strip().upper().startswith("PASS")
+        final_diff = None
+        final_patched = None
 
-        if not args.dry_run:
-            # Apply SEARCH/REPLACE blocks
-            patched, n_applied = apply_search_replace(source_code, diff_raw)
-            if n_applied == 0:
-                print(f"\n  ⚠️  No SEARCH blocks matched source (attempt {attempt}/{MAX_RETRIES})")
+        for attempt in range(1, MAX_RETRIES + 1):
+            design   = agent_architect(client, args.model, sub_wish, source_code, token_counter, args.dry_run, use_responses)
+            diff_raw = agent_coder(client, args.model, sub_wish, source_code, design, token_counter, args.dry_run, use_responses)
+            review   = agent_reviewer(client, args.model, sub_wish, source_code, diff_raw, token_counter, args.dry_run, use_responses)
+            tests    = agent_tester(client, args.model, sub_wish, diff_raw, token_counter, args.dry_run, use_responses)
+
+            passed = args.dry_run or review.strip().upper().startswith("PASS")
+
+            if not args.dry_run:
+                patched, n_applied = apply_search_replace(source_code, diff_raw)
+                if n_applied == 0:
+                    print(f"\n  ⚠️  No SEARCH blocks matched source (attempt {attempt}/{MAX_RETRIES})")
+                    if attempt == MAX_RETRIES:
+                        print(f"\n  Sub-task {task_idx} failed. Writing failure report.")
+                        Path("FAILED.md").write_text(
+                            f"# Evolve failed\n\nSub-task {task_idx}: {sub_wish}\n\nNo SEARCH blocks matched.\n\nPatch:\n{diff_raw}\n\nReview:\n{review}"
+                        )
+                        sys.exit(1)
+                    continue
+                diff_text = diff_raw
+            else:
+                diff_text = diff_raw
+                patched = source_code + f"\n# evolve: sub-task {task_idx} simulated\n"
+
+            if passed:
+                print(f"\n  Review: ✅ PASS")
+                final_diff = diff_text
+                final_patched = patched
+                break
+            else:
+                print(f"\n  Review: ❌ FAIL (attempt {attempt}/{MAX_RETRIES})")
+                print(f"  Reason: {review[:200]}")
                 if attempt == MAX_RETRIES:
-                    print("\n  All attempts failed. Writing failure report.")
+                    print(f"\n  Sub-task {task_idx} failed after {MAX_RETRIES} attempts.")
                     Path("FAILED.md").write_text(
-                        f"# Evolve failed\n\nWish: {args.wish}\n\nNo SEARCH blocks matched.\n\nPatch:\n{diff_raw}\n\nReview:\n{review}"
+                        f"# Evolve failed\n\nSub-task {task_idx}: {sub_wish}\n\nReview:\n{review}"
                     )
                     sys.exit(1)
-                continue
-            diff_text = diff_raw  # store for CHANGES.md
-        else:
-            diff_text = diff_raw
-            patched = source_code + "\n# evolve: simulated change\n"
+                source_code = patched  # feed patched back for retry
 
-        if passed:
-            print(f"\n  Review: ✅ PASS")
-            final_diff = diff_text
-            final_patched = patched
-            break
-        else:
-            print(f"\n  Review: ❌ FAIL (attempt {attempt}/{MAX_RETRIES})")
-            print(f"  Reason: {review[:200]}")
-            if attempt == MAX_RETRIES:
-                print("\n  All attempts failed. Writing failure report.")
-                Path("FAILED.md").write_text(
-                    f"# Evolve failed\n\nWish: {args.wish}\n\nReview:\n{review}"
-                )
-                sys.exit(1)
-            # Feed the patched code back for next attempt
-            source_code = patched
+        # Accumulate
+        all_diffs.append(final_diff)
+        all_designs.append(design)
+        all_reviews.append(review)
+        all_tests.append(tests)
 
-    # Apply patch to burn.py
-    if not args.dry_run and final_patched:
-        SOURCE_FILE.write_text(final_patched)
-        print(f"  ✅ Patched: {SOURCE_FILE.name}")
+        # Apply sub-task patch to live source for next sub-task
+        if not args.dry_run and final_patched:
+            source_code = final_patched
+            SOURCE_FILE.write_text(final_patched)
+            print(f"  ✅ Patched: {SOURCE_FILE.name} (sub-task {task_idx}/{len(sub_tasks)})")
+
+    final_diff = "\n\n---\n\n".join(d for d in all_diffs if d)
 
     # Pad to target token count if needed
     if not args.dry_run and token_counter[0] < target:
@@ -422,7 +499,8 @@ def main():
 
     # Write CHANGES.md
     print(f"\n  Writing outputs...")
-    write_outputs(final_diff, design, review, tests, args.wish)
+    write_outputs(final_diff, "\n\n---\n\n".join(all_designs),
+                  "\n\n---\n\n".join(all_reviews), "\n\n---\n\n".join(all_tests), args.wish)
 
     # Open PR
     if not args.no_pr:
