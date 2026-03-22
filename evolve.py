@@ -36,6 +36,12 @@ except ImportError:
     print("Error: pip install openai")
     sys.exit(1)
 
+try:
+    import anthropic as _anthropic_module
+    HAS_ANTHROPIC = True
+except ImportError:
+    HAS_ANTHROPIC = False
+
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
@@ -66,6 +72,9 @@ Examples:
     parser.add_argument("--api", default="completions",
         choices=["completions", "responses"],
         help="OpenAI API type: completions (default) or responses (for gpt-5.x)")
+    parser.add_argument("--sdk", default="openai",
+        choices=["openai", "anthropic"],
+        help="SDK to use: openai (default) or anthropic (for Claude models via Anthropic API)")
     parser.add_argument("--no-pr", action="store_true",
         help="Skip opening a GitHub PR")
     parser.add_argument("--dry-run", action="store_true",
@@ -84,25 +93,45 @@ def parse_target(s: str) -> int:
 
 # ── LLM client ────────────────────────────────────────────────────────────────
 
-def make_client(api_key, base_url):
-    kwargs = {"api_key": api_key or os.environ.get("OPENAI_API_KEY", "")}
-    if base_url:
-        kwargs["base_url"] = base_url
-    return OpenAI(**kwargs)
+def make_client(api_key, base_url, sdk="openai"):
+    if sdk == "anthropic":
+        if not HAS_ANTHROPIC:
+            print("Error: pip install anthropic")
+            sys.exit(1)
+        kwargs = {"api_key": api_key or os.environ.get("ANTHROPIC_API_KEY", os.environ.get("ANTHROPIC_AUTH_TOKEN", ""))}
+        if base_url:
+            kwargs["base_url"] = base_url
+        return _anthropic_module.Anthropic(**kwargs)
+    else:
+        kwargs = {"api_key": api_key or os.environ.get("OPENAI_API_KEY", "")}
+        if base_url:
+            kwargs["base_url"] = base_url
+        return OpenAI(**kwargs)
 
 
 def call(client, model, system, user, label="", token_counter=None, use_responses_api=False):
-    """Single LLM call. Supports both chat/completions and Responses API."""
+    """Single LLM call. Supports OpenAI (completions/responses) and Anthropic SDK."""
     if label:
         print(f"  → {label}...", end="", flush=True)
 
-    if use_responses_api:
+    # Detect Anthropic client
+    if HAS_ANTHROPIC and isinstance(client, _anthropic_module.Anthropic):
+        resp = client.messages.create(
+            model=model,
+            system=system,
+            messages=[{"role": "user", "content": user}],
+            max_tokens=4000,
+        )
+        text = resp.content[0].text if resp.content else ""
+        usage = resp.usage
+        tokens = (getattr(usage, 'input_tokens', 0) + getattr(usage, 'output_tokens', 0)) if usage else 0
+    elif use_responses_api:
         resp = client.responses.create(
             model=model,
             input=f"{system}\n\n{user}",
             max_output_tokens=4000,
         )
-        # SDK may return str on some proxy implementations — fall through to attr access
+        # SDK may return str on some proxy implementations
         if isinstance(resp, str):
             text = resp
             tokens = 0
@@ -418,7 +447,7 @@ def main():
     print(f"    Model  : {args.model}")
     print(f"    Mode   : {'DRY RUN' if args.dry_run else 'LIVE'}\n")
 
-    client = None if args.dry_run else make_client(args.api_key, args.base_url)
+    client = None if args.dry_run else make_client(args.api_key, args.base_url, args.sdk)
     use_responses = (args.api == "responses")
 
     # PM: decompose wish into atomic sub-tasks

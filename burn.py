@@ -5,6 +5,7 @@ Congratulations — you are now Sisyphus, and the boulder is a chatbot.
 """
 
 import argparse
+import json
 import os
 import sys
 import time
@@ -42,7 +43,7 @@ PROMPTS = [
 
 # ── Provider adapters ─────────────────────────────────────────────────────────
 
-def burn_openai(target, model, api_key, base_url, max_tokens, delay, dry_run, use_responses_api=False):
+def burn_openai(target, model, api_key, base_url, max_tokens, delay, dry_run, use_responses_api=False, output_format=None, provider="openai"):
     """OpenAI and OpenAI-compatible APIs. Supports both chat/completions and Responses API."""
     try:
         from openai import OpenAI
@@ -78,10 +79,10 @@ def burn_openai(target, model, api_key, base_url, max_tokens, delay, dry_run, us
             )
             return resp.usage.total_tokens if resp.usage else max_tokens
 
-    return _run_loop(target, model, delay, dry_run, call)
+    return _run_loop(target, model, delay, dry_run, call, output_format=output_format, provider=provider)
 
 
-def burn_claude(target, model, api_key, max_tokens, delay, dry_run):
+def burn_claude(target, model, api_key, max_tokens, delay, dry_run, output_format=None, provider="claude"):
     """Anthropic Claude API."""
     try:
         import anthropic
@@ -104,10 +105,10 @@ def burn_claude(target, model, api_key, max_tokens, delay, dry_run):
         usage = resp.usage
         return (usage.input_tokens + usage.output_tokens) if usage else max_tokens
 
-    return _run_loop(target, model, delay, dry_run, call)
+    return _run_loop(target, model, delay, dry_run, call, output_format=output_format, provider=provider)
 
 
-def burn_gemini(target, model, api_key, max_tokens, delay, dry_run):
+def burn_gemini(target, model, api_key, max_tokens, delay, dry_run, output_format=None, provider="gemini"):
     """Google Gemini API."""
     try:
         import google.generativeai as genai
@@ -129,12 +130,12 @@ def burn_gemini(target, model, api_key, max_tokens, delay, dry_run):
             return usage.prompt_token_count + usage.candidates_token_count
         return max_tokens
 
-    return _run_loop(target, model, delay, dry_run, call)
+    return _run_loop(target, model, delay, dry_run, call, output_format=output_format, provider=provider)
 
 
 # ── Core loop ─────────────────────────────────────────────────────────────────
 
-def _run_loop(target, model, delay, dry_run, call_fn):
+def _run_loop(target, model, delay, dry_run, call_fn, output_format=None, provider=None):
     total_tokens = 0
     request_count = 0
     start_time = time.time()
@@ -156,22 +157,40 @@ def _run_loop(target, model, delay, dry_run, call_fn):
                     time.sleep(2)
                     continue
 
-            bar = _progress_bar(total_tokens, target)
-            print(f"\r  {bar}  req#{request_count}", end="", flush=True)
+            if output_format != "json":
+                bar = _progress_bar(total_tokens, target)
+                print(f"\r  {bar}  req#{request_count}", end="", flush=True)
 
             if total_tokens < target:
                 time.sleep(delay)
 
     except KeyboardInterrupt:
-        print("\n\n  Interrupted.")
+        if output_format != "json":
+            print("\n\n  Interrupted.")
 
     elapsed = time.time() - start_time
-    print(f"\n\n✅  Done.")
-    print(f"    Total tokens burned : {total_tokens:,}")
-    print(f"    Requests made       : {request_count}")
-    print(f"    Time elapsed        : {elapsed:.1f}s")
-    print(f"    Avg tokens/req      : {total_tokens // max(request_count, 1):,}")
-    print(f"\n    Your boulder has reached the top. See you tomorrow.\n")
+    avg_tokens = total_tokens // max(request_count, 1)
+
+    if output_format == "json":
+        summary = {
+            "total_tokens": total_tokens,
+            "requests": request_count,
+            "elapsed_seconds": round(elapsed, 2),
+            "avg_tokens_per_request": avg_tokens,
+            "model": model,
+            "target": target,
+            "provider": provider,
+        }
+        if dry_run:
+            summary["dry_run"] = True
+        print(json.dumps(summary))
+    else:
+        print(f"\n\n✅  Done.")
+        print(f"    Total tokens burned : {total_tokens:,}")
+        print(f"    Requests made       : {request_count}")
+        print(f"    Time elapsed        : {elapsed:.1f}s")
+        print(f"    Avg tokens/req      : {avg_tokens:,}")
+        print(f"\n    Your boulder has reached the top. See you tomorrow.\n")
 
 
 def _progress_bar(current: int, total: int, width: int = 40) -> str:
@@ -232,6 +251,8 @@ Examples:
         help="Run continuously, starting a new burn cycle every N minutes; 0 means disabled")
     parser.add_argument("--dry-run", action="store_true",
         help="Simulate without real API calls")
+    parser.add_argument("--output", choices=["json"], default=None,
+        help="Output format: json prints a JSON summary at the end")
     return parser.parse_args()
 
 
@@ -257,41 +278,47 @@ def main():
     target = parse_target(args.target)
     model = args.model or PROVIDER_DEFAULTS[args.provider]
 
-    print(f"\n🪨  token-sisyphus starting...")
-    print(f"    Provider : {args.provider}")
-    print(f"    Target   : {target:,} tokens")
-    print(f"    Model    : {model}")
-    if args.schedule > 0:
-        print(f"    Schedule : every {args.schedule:g} minutes")
-    if args.dry_run:
-        print(f"    Mode     : DRY RUN (no real API calls)\n")
-    else:
-        env_var = ENV_VARS[args.provider]
-        key_src = "--api-key" if args.api_key else f"${env_var}"
-        print(f"    API key  : {key_src}")
-        print(f"    Mode     : LIVE\n")
+    if args.output != "json":
+        print(f"\n🪨  token-sisyphus starting...")
+        print(f"    Provider : {args.provider}")
+        print(f"    Target   : {target:,} tokens")
+        print(f"    Model    : {model}")
+        if args.schedule > 0:
+            print(f"    Schedule : every {args.schedule:g} minutes")
+        if args.dry_run:
+            print(f"    Mode     : DRY RUN (no real API calls)\n")
+        else:
+            env_var = ENV_VARS[args.provider]
+            key_src = "--api-key" if args.api_key else f"${env_var}"
+            print(f"    API key  : {key_src}")
+            print(f"    Mode     : LIVE\n")
 
     def run_once():
         if args.provider == "openai":
             burn_openai(target, model, args.api_key, args.base_url,
                         args.max_tokens, args.delay, args.dry_run,
-                        use_responses_api=(args.api == "responses"))
+                        use_responses_api=(args.api == "responses"),
+                        output_format=args.output, provider=args.provider)
         elif args.provider == "claude":
             burn_claude(target, model, args.api_key,
-                        args.max_tokens, args.delay, args.dry_run)
+                        args.max_tokens, args.delay, args.dry_run,
+                        output_format=args.output, provider=args.provider)
         elif args.provider == "gemini":
             burn_gemini(target, model, args.api_key,
-                        args.max_tokens, args.delay, args.dry_run)
+                        args.max_tokens, args.delay, args.dry_run,
+                        output_format=args.output, provider=args.provider)
 
     while True:
         try:
             run_once()
             if args.schedule == 0:
                 break
-            print(f"⏲️  Next burn cycle starts in {args.schedule:g} minutes. Press Ctrl+C to stop.")
+            if args.output != "json":
+                print(f"⏲️  Next burn cycle starts in {args.schedule:g} minutes. Press Ctrl+C to stop.")
             time.sleep(args.schedule * 60)
         except KeyboardInterrupt:
-            print("\n\nStopped by user.")
+            if args.output != "json":
+                print("\n\nStopped by user.")
             break
 
 
